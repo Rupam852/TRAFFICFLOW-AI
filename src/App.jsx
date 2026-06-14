@@ -73,6 +73,35 @@ export default function App() {
     localStorage.setItem('tf_weather', weather);
   }, [weather]);
 
+  // Retrieve user's current location via HTML5 Geolocation API on login
+  useEffect(() => {
+    if (!user) return;
+    
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { longitude, latitude } = position.coords;
+          setStartLocation({
+            name: 'My Current Location',
+            coordinates: [longitude, latitude]
+          });
+        },
+        (error) => {
+          console.warn('Geolocation failed, defaulting to CP, New Delhi:', error);
+          setStartLocation({
+            name: 'My Current Location (Delhi CP)',
+            coordinates: [77.2090, 28.6139]
+          });
+        }
+      );
+    } else {
+      setStartLocation({
+        name: 'My Current Location (Delhi CP)',
+        coordinates: [77.2090, 28.6139]
+      });
+    }
+  }, [user]);
+
   const handleAuthSuccess = (authUser) => {
     setUser(authUser);
     // Show disclaimer warning banner on first login

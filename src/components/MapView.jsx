@@ -171,29 +171,30 @@ export default function MapView({
       });
     }
 
-    if (!destination) return;
-
-    // Render Start / Destination Pins
+    // Render Start Pin if available
     const startLatLng = startLocation?.coordinates 
       ? { lat: startLocation.coordinates[1], lng: startLocation.coordinates[0] }
-      : { lat: 28.6139, lng: 77.2090 };
+      : null;
 
-    const endLatLng = { lat: destination.coordinates[1], lng: destination.coordinates[0] };
+    if (startLatLng) {
+      const startMarker = new window.google.maps.Marker({
+        position: startLatLng,
+        map: map,
+        title: startLocation?.name || "Start Location",
+        icon: {
+          path: window.google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#4f46e5',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        }
+      });
+      markersRef.current.push(startMarker);
+      map.panTo(startLatLng);
+    }
 
-    const startMarker = new window.google.maps.Marker({
-      position: startLatLng,
-      map: map,
-      title: startLocation?.name || "Start Location",
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 8,
-        fillColor: '#4f46e5',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 2,
-      }
-    });
-    markersRef.current.push(startMarker);
+    if (!destination) return;
 
     const endMarker = new window.google.maps.Marker({
       position: endLatLng,
