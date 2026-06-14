@@ -391,7 +391,29 @@ export default function MapView({
 
       {/* Map Control Widget: Weather & Day/Night Toggle */}
       <div className="glass-panel" style={styles.weatherWidget}>
-        <span style={styles.widgetHeader}>Climate & Time Engine</span>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <span style={{ ...styles.widgetHeader, marginBottom: 0 }}>Climate & Time Engine</span>
+          {settings.openWeatherKey && (
+            <span 
+              style={{ 
+                fontSize: '0.65rem', 
+                color: 'var(--traffic-smooth)', 
+                fontWeight: '800', 
+                textTransform: 'uppercase', 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: '4px',
+                backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                border: '1px solid rgba(16, 185, 129, 0.25)',
+              }}
+              title="Live Weather & Day-Night cycle syncing automatically via OpenWeatherMap"
+            >
+              🟢 Live Auto
+            </span>
+          )}
+        </div>
         
         <div style={styles.widgetGroup}>
           <span style={styles.widgetLabel}>Weather Mode:</span>

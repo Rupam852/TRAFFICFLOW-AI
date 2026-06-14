@@ -17,6 +17,7 @@ export default function App() {
     googleMapsKey: localStorage.getItem('tf_google_maps_key') || '',
     mapboxKey: localStorage.getItem('tf_mapbox_key') || '',
     tomtomKey: localStorage.getItem('tf_tomtom_key') || '',
+    openWeatherKey: localStorage.getItem('tf_open_weather_key') || '',
     aiProvider: localStorage.getItem('tf_ai_provider') || 'gemini',
     aiKey: localStorage.getItem('tf_ai_key') || '',
   });
@@ -150,9 +151,70 @@ export default function App() {
     localStorage.setItem('tf_google_maps_key', newSettings.googleMapsKey || '');
     localStorage.setItem('tf_mapbox_key', newSettings.mapboxKey);
     localStorage.setItem('tf_tomtom_key', newSettings.tomtomKey);
+    localStorage.setItem('tf_open_weather_key', newSettings.openWeatherKey || '');
     localStorage.setItem('tf_ai_provider', newSettings.aiProvider);
     localStorage.setItem('tf_ai_key', newSettings.aiKey);
   };
+
+  // Fetch live weather dynamically if OpenWeatherMap API key is present
+  useEffect(() => {
+    if (!settings.openWeatherKey) return;
+    
+    // We fetch weather at the starting location coordinates
+    const coords = startLocation?.coordinates || [77.2090, 28.6139]; // Default Delhi CP
+    const [lng, lat] = coords;
+    
+    const fetchLiveWeather = async () => {
+      try {
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${settings.openWeatherKey}&units=metric`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('Weather API request failed');
+        const data = await res.json();
+        
+        if (data.weather && data.weather[0]) {
+          const main = data.weather[0].main.toLowerCase();
+          const desc = data.weather[0].description.toLowerCase();
+          
+          // Map to app weather states: 'clear' | 'rain' | 'fog'
+          if (main.includes('rain') || main.includes('drizzle') || main.includes('thunderstorm') || desc.includes('rain')) {
+            setWeather('rain');
+          } else if (main.includes('fog') || main.includes('mist') || main.includes('haze') || main.includes('smoke') || desc.includes('fog') || desc.includes('haze')) {
+            setWeather('fog');
+          } else {
+            setWeather('clear');
+          }
+          
+          // Map to Day-Night Cycle using data.dt, data.sys.sunrise, data.sys.sunset
+          const dt = data.dt;
+          const sunrise = data.sys.sunrise;
+          const sunset = data.sys.sunset;
+          
+          if (dt && sunrise && sunset) {
+            const sunriseDiff = Math.abs(dt - sunrise);
+            const sunsetDiff = Math.abs(dt - sunset);
+            
+            if (sunriseDiff < 3600) { // Within 1 hour of sunrise
+              setTimeOfDay('sunrise');
+            } else if (sunsetDiff < 3600) { // Within 1 hour of sunset
+              setTimeOfDay('sunset');
+            } else if (dt > sunrise && dt < sunset) {
+              setTimeOfDay('day');
+            } else {
+              setTimeOfDay('night');
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch live weather data:', err);
+      }
+    };
+
+    fetchLiveWeather();
+    
+    // Refresh weather every 10 minutes
+    const interval = setInterval(fetchLiveWeather, 600000);
+    return () => clearInterval(interval);
+  }, [startLocation, settings.openWeatherKey]);
 
   // Generate mock routes or fetch from Mapbox / TomTom APIs
   useEffect(() => {

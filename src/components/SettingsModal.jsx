@@ -6,12 +6,14 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
   const [googleMapsKey, setGoogleMapsKey] = useState(settings.googleMapsKey || '');
   const [mapboxKey, setMapboxKey] = useState(settings.mapboxKey || '');
   const [tomtomKey, setTomtomKey] = useState(settings.tomtomKey || '');
+  const [openWeatherKey, setOpenWeatherKey] = useState(settings.openWeatherKey || '');
   const [aiProvider, setAiProvider] = useState(settings.aiProvider || 'gemini');
   const [aiKey, setAiKey] = useState(settings.aiKey || '');
 
   const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showMapboxKey, setShowMapboxKey] = useState(false);
   const [showTomKey, setShowTomKey] = useState(false);
+  const [showWeatherKey, setShowWeatherKey] = useState(false);
   const [showAiKey, setShowAiKey] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
@@ -21,6 +23,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
     setGoogleMapsKey(settings.googleMapsKey || '');
     setMapboxKey(settings.mapboxKey || '');
     setTomtomKey(settings.tomtomKey || '');
+    setOpenWeatherKey(settings.openWeatherKey || '');
     setAiProvider(settings.aiProvider || 'gemini');
     setAiKey(settings.aiKey || '');
   }, [settings, isOpen]);
@@ -34,6 +37,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
       googleMapsKey,
       mapboxKey,
       tomtomKey,
+      openWeatherKey,
       aiProvider,
       aiKey,
     });
@@ -178,6 +182,29 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                   </button>
                 </div>
                 <span style={styles.helperText}>Used for real-time delay, incident analysis, and congestion mapping.</span>
+              </div>
+
+              <div className="input-group">
+                <label>OpenWeatherMap API Key (Optional)</label>
+                <div style={styles.inputWrapper}>
+                  <Key size={16} style={styles.inputIcon} />
+                  <input
+                    type={showWeatherKey ? 'text' : 'password'}
+                    className="input-field"
+                    placeholder="OpenWeatherMap appid..."
+                    value={openWeatherKey}
+                    onChange={(e) => setOpenWeatherKey(e.target.value)}
+                    style={styles.fieldPadding}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowWeatherKey(!showWeatherKey)}
+                    style={styles.eyeBtn}
+                  >
+                    {showWeatherKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <span style={styles.helperText}>Enables automatic climate & day-night time cycles sync on the map based on live real-world weather.</span>
               </div>
             </div>
 
