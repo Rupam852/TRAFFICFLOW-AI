@@ -3,11 +3,13 @@ import { X, ShieldAlert, Key, Globe, Eye, EyeOff, Check, Moon, Sun, Monitor } fr
 
 export default function SettingsModal({ isOpen, onClose, settings, onSaveSettings }) {
   const [theme, setTheme] = useState(settings.theme || 'dark');
+  const [googleMapsKey, setGoogleMapsKey] = useState(settings.googleMapsKey || '');
   const [mapboxKey, setMapboxKey] = useState(settings.mapboxKey || '');
   const [tomtomKey, setTomtomKey] = useState(settings.tomtomKey || '');
   const [aiProvider, setAiProvider] = useState(settings.aiProvider || 'gemini');
   const [aiKey, setAiKey] = useState(settings.aiKey || '');
 
+  const [showGoogleKey, setShowGoogleKey] = useState(false);
   const [showMapboxKey, setShowMapboxKey] = useState(false);
   const [showTomKey, setShowTomKey] = useState(false);
   const [showAiKey, setShowAiKey] = useState(false);
@@ -16,6 +18,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
   // Sync state if settings prop changes
   useEffect(() => {
     setTheme(settings.theme || 'dark');
+    setGoogleMapsKey(settings.googleMapsKey || '');
     setMapboxKey(settings.mapboxKey || '');
     setTomtomKey(settings.tomtomKey || '');
     setAiProvider(settings.aiProvider || 'gemini');
@@ -28,6 +31,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
     e.preventDefault();
     onSaveSettings({
       theme,
+      googleMapsKey,
       mapboxKey,
       tomtomKey,
       aiProvider,
@@ -106,6 +110,30 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
             {/* Map & Traffic Integration */}
             <div style={styles.section}>
               <h4 style={styles.sectionTitle}>Mapping Credentials</h4>
+              
+              <div className="input-group">
+                <label>Google Maps API Key (Optional)</label>
+                <div style={styles.inputWrapper}>
+                  <Key size={16} style={styles.inputIcon} />
+                  <input
+                    type={showGoogleKey ? 'text' : 'password'}
+                    className="input-field"
+                    placeholder="Keyless / Local fallback by default..."
+                    value={googleMapsKey}
+                    onChange={(e) => setGoogleMapsKey(e.target.value)}
+                    style={styles.fieldPadding}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowGoogleKey(!showGoogleKey)}
+                    style={styles.eyeBtn}
+                  >
+                    {showGoogleKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                <span style={styles.helperText}>Used for real-time maps, POI geocoding, and Google directions routing.</span>
+              </div>
+
               <div className="input-group">
                 <label>Mapbox GL Access Token</label>
                 <div style={styles.inputWrapper}>

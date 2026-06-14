@@ -13,6 +13,7 @@ export default function App() {
   // Settings State
   const [settings, setSettings] = useState({
     theme: localStorage.getItem('tf_theme') || 'dark',
+    googleMapsKey: localStorage.getItem('tf_google_maps_key') || '',
     mapboxKey: localStorage.getItem('tf_mapbox_key') || '',
     tomtomKey: localStorage.getItem('tf_tomtom_key') || '',
     aiProvider: localStorage.getItem('tf_ai_provider') || 'gemini',
@@ -90,6 +91,7 @@ export default function App() {
   const handleSaveSettings = (newSettings) => {
     setSettings(newSettings);
     localStorage.setItem('tf_theme', newSettings.theme);
+    localStorage.setItem('tf_google_maps_key', newSettings.googleMapsKey || '');
     localStorage.setItem('tf_mapbox_key', newSettings.mapboxKey);
     localStorage.setItem('tf_tomtom_key', newSettings.tomtomKey);
     localStorage.setItem('tf_ai_provider', newSettings.aiProvider);
