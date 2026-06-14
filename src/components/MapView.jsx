@@ -85,7 +85,6 @@ export default function MapView({
   onMapClick,
   navMarkerPos,
   navMarkerBearing,
-  isNavigating,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -231,7 +230,7 @@ export default function MapView({
         },
       });
       markersRef.current.push(startMarker);
-      if (!isNavigating) {
+      if (!navMarkerRef.current) {
         map.panTo(startLatLng);
       }
     }
@@ -337,7 +336,7 @@ export default function MapView({
 
 
 
-  }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois, isNavigating]);
+  }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois]);
 
   // Move navigator dot on the map when position updates
   useEffect(() => {

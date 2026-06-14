@@ -28,8 +28,7 @@ export default function Sidebar({
   user,
   onShareEta,
   travelMode,
-  onTravelModeChange,
-  onStartNavigation
+  onTravelModeChange
 }) {
   const [activeTab, setActiveTab] = useState('nav'); // 'nav' or 'ai'
   const [startInput, setStartInput] = useState(startLocation?.name || '');
@@ -833,18 +832,6 @@ export default function Sidebar({
                         </div>
                         {route.delayInfo && (
                           <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
-                        )}
-                        {isSelected && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onStartNavigation(idx);
-                            }}
-                            className="glow-btn"
-                            style={styles.startNavBtn}
-                          >
-                            🚀 Start Live Navigation
-                          </button>
                         )}
                       </div>
                     );

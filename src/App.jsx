@@ -5,7 +5,6 @@ import MapView from './components/MapView';
 import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
-import NavigationHUD from './components/NavigationHUD';
 import { Menu } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
 
@@ -38,8 +37,7 @@ export default function App() {
   const [timeOfDay, setTimeOfDay] = useState('day');
   const [travelMode, setTravelMode] = useState('car'); // 'car' | 'motorbike' | 'bicycle' | 'walk'
 
-  // Navigation (Turn-by-Turn HUD) States
-  const [isNavigating, setIsNavigating] = useState(false);
+  // Live GPS tracking states (marker position & orientation)
   const [navMarkerPos, setNavMarkerPos] = useState(null); // [lng, lat] of moving navigator dot
   const [navMarkerBearing, setNavMarkerBearing] = useState(null); // heading angle in degrees (0-360)
   const lastSearchedDestNameRef = useRef(null);
@@ -253,6 +251,36 @@ export default function App() {
       });
     }
   }, []);
+
+  // Live GPS tracking watcher to move the navigator dot and follow user's position
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const { longitude, latitude, heading } = pos.coords;
+        setNavMarkerPos([longitude, latitude]);
+        if (heading !== null && heading !== undefined) {
+          setNavMarkerBearing(heading);
+        }
+        
+        // Update startLocation coordinates if it's set to "My Current Location"
+        if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
+          setStartLocation(prev => {
+            if (!prev) return null;
+            return {
+              ...prev,
+              coordinates: [longitude, latitude]
+            };
+          });
+        }
+      },
+      (err) => console.warn('GPS watch error:', err),
+      { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
+    );
+
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [startLocation?.name]);
 
   const handleAuthSuccess = (authUser) => {
     setUser(authUser);
@@ -1015,34 +1043,7 @@ export default function App() {
     setDestination({ name: poi.name, coordinates: poi.coordinates });
   };
 
-  const handleStartNavigation = (routeIdx) => {
-    setSelectedRouteIndex(routeIdx);
-    setIsNavigating(true);
-    setIsSidebarOpen(false);
-  };
 
-  const handleStopNavigation = () => {
-    setIsNavigating(false);
-    setNavMarkerPos(null);
-    setNavMarkerBearing(null);
-    lastSearchedDestNameRef.current = null;
-    setDestination(null);
-    setRouteOptions([]);
-    setSelectedRouteIndex(0);
-    setIsSidebarOpen(window.innerWidth > 640);
-  };
-
-  // Called when GPS detects arrival at destination — full reset
-  const handleArrived = () => {
-    setIsNavigating(false);
-    setNavMarkerPos(null);
-    setNavMarkerBearing(null);
-    lastSearchedDestNameRef.current = null;
-    setDestination(null);
-    setRouteOptions([]);
-    setSelectedRouteIndex(0);
-    setIsSidebarOpen(window.innerWidth > 640);
-  };
 
   if (authLoading) {
     return (
@@ -1199,7 +1200,6 @@ export default function App() {
         onShareEta={() => setIsShareEtaOpen(true)}
         travelMode={travelMode}
         onTravelModeChange={setTravelMode}
-        onStartNavigation={handleStartNavigation}
       />
 
       <MapView
@@ -1223,23 +1223,7 @@ export default function App() {
         }}
         navMarkerPos={navMarkerPos}
         navMarkerBearing={navMarkerBearing}
-        isNavigating={isNavigating}
       />
-
-      {/* Live Navigation HUD Overlay */}
-      {isNavigating && routeOptions[selectedRouteIndex] && (
-        <NavigationHUD
-          route={routeOptions[selectedRouteIndex]}
-          travelMode={travelMode}
-          destination={destination}
-          onStop={handleStopNavigation}
-          onArrived={handleArrived}
-          onPositionUpdate={(pos, bearing) => {
-            setNavMarkerPos(pos);
-            setNavMarkerBearing(bearing);
-          }}
-        />
-      )}
 
     </div>
   );
