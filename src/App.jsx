@@ -263,24 +263,13 @@ export default function App() {
         if (heading !== null && heading !== undefined) {
           setNavMarkerBearing(heading);
         }
-        
-        // Update startLocation coordinates if it's set to "My Current Location"
-        if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
-          setStartLocation(prev => {
-            if (!prev) return null;
-            return {
-              ...prev,
-              coordinates: [longitude, latitude]
-            };
-          });
-        }
       },
       (err) => console.warn('GPS watch error:', err),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
     );
 
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [startLocation?.name]);
+  }, []);
 
   const handleAuthSuccess = (authUser) => {
     setUser(authUser);
