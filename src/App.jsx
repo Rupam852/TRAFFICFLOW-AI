@@ -391,7 +391,7 @@ export default function App() {
   // Speed (km/h) per travel mode — used for mock route duration estimation
   const modeSpeed = { car: 50, motorbike: 65, bicycle: 18, walk: 5 };
 
-  // Generate dynamic interpolated mock routes as fallback (aligned to a grid to simulate real road streets)
+  // Generate dynamic interpolated mock routes as fallback with realistic winding curves
   const generateDynamicMockRoutes = (start, end) => {
     const dLng = end[0] - start[0];
     const dLat = end[1] - start[1];
@@ -400,37 +400,49 @@ export default function App() {
     // Approximate distance in km (1 degree ≈ 111 km)
     const distKm = parseFloat((distDegrees * 111 * 1.25).toFixed(1));
 
-    // Speed per mode; alternate routes are 15 % and 35 % slower (traffic)
+    // Speed per mode; alternate routes are slower
     const baseSpeed  = modeSpeed[travelMode] || 50;
     const dur1 = Math.max(1, (distKm / baseSpeed) * 60);                  // express
-    const dur2 = Math.max(1, (distKm * 1.2) / (baseSpeed * 0.85) * 60);  // bypass (longer + moderate)
-    const dur3 = Math.max(1, (distKm * 0.95) / (baseSpeed * 0.65) * 60); // city streets (heavy)
+    const dur2 = Math.max(1, (distKm * 1.2) / (baseSpeed * 0.85) * 60);  // bypass
+    const dur3 = Math.max(1, (distKm * 0.95) / (baseSpeed * 0.65) * 60); // city streets
 
-    // Route 1 (Express - L-shape grid path: horizontal then vertical with corner step)
-    const route1Geom = [
-      start,
-      [start[0] + dLng * 0.8, start[1]],
-      [start[0] + dLng * 0.8, start[1] + dLat * 0.95],
-      end
-    ];
+    // Helper to generate a realistic winding curve between start and end
+    const generateCurvedPath = (p0, p2, offsetDirection = 0) => {
+      const points = [];
+      const steps = 30;
+      
+      const perpLng = -dLat;
+      const perpLat = dLng;
+      
+      const offsetFactor = 0.18 * offsetDirection;
+      const p1 = [
+        p0[0] + dLng * 0.5 + perpLng * offsetFactor,
+        p0[1] + dLat * 0.5 + perpLat * offsetFactor
+      ];
+      
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const u = 1 - t;
+        const tt = t * t;
+        const uu = u * u;
+        
+        const lng = uu * p0[0] + 2 * u * t * p1[0] + tt * p2[0];
+        const lat = uu * p0[1] + 2 * u * t * p1[1] + tt * p2[1];
+        
+        // Add a small sine wave wiggle to look like real winding streets
+        const frequency = 6;
+        const amplitude = 0.006 * Math.sin(t * Math.PI); // zero offset at exactly start & end
+        const waveLng = amplitude * Math.sin(t * Math.PI * frequency);
+        const waveLat = amplitude * Math.cos(t * Math.PI * frequency);
+        
+        points.push([lng + waveLng, lat + waveLat]);
+      }
+      return points;
+    };
 
-    // Route 2 (Bypass - outer grid path: vertical then horizontal)
-    const route2Geom = [
-      start,
-      [start[0], start[1] + dLat * 0.9],
-      [start[0] + dLng * 0.95, start[1] + dLat * 0.9],
-      end
-    ];
-
-    // Route 3 (City streets - multi-step grid staircase)
-    const route3Geom = [
-      start,
-      [start[0] + dLng * 0.35, start[1]],
-      [start[0] + dLng * 0.35, start[1] + dLat * 0.5],
-      [start[0] + dLng * 0.7, start[1] + dLat * 0.5],
-      [start[0] + dLng * 0.7, start[1] + dLat],
-      end
-    ];
+    const route1Geom = generateCurvedPath(start, end, 0.05);  // slightly curved
+    const route2Geom = generateCurvedPath(start, end, 0.35);  // curved outer route
+    const route3Geom = generateCurvedPath(start, end, -0.25); // curved inner route
 
     return [
       {
@@ -903,7 +915,9 @@ export default function App() {
 
   const handleSelectBookmark = (bm) => {
     setDestination({ name: bm.address, coordinates: bm.coordinates });
-    setIsSidebarOpen(false);
+    if (window.innerWidth <= 640) {
+      setIsSidebarOpen(false);
+    }
   };
 
   const handleRemoveBookmark = async (indexToRemove) => {
@@ -931,7 +945,9 @@ export default function App() {
   // Search History Action
   const handleSelectHistory = (item) => {
     setDestination({ name: item.name, coordinates: item.coordinates });
-    setIsSidebarOpen(false);
+    if (window.innerWidth <= 640) {
+      setIsSidebarOpen(false);
+    }
   };
 
   const handleRemoveHistory = async (indexToRemove) => {
@@ -1190,7 +1206,11 @@ export default function App() {
         setTimeOfDay={setTimeOfDay}
         pois={pois}
         onPoiClick={handlePoiClick}
-        onMapClick={() => setIsSidebarOpen(false)}
+        onMapClick={() => {
+          if (window.innerWidth <= 640) {
+            setIsSidebarOpen(false);
+          }
+        }}
         navMarkerPos={navMarkerPos}
         navMarkerBearing={navMarkerBearing}
       />
