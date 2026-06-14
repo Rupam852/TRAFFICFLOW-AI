@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, Shield, MessageSquareText, HelpCircle } from 'lucide-react';
 import AiPanel from './AiPanel';
 
@@ -27,6 +27,15 @@ export default function Sidebar({
   const [destInput, setDestInput] = useState(destination?.name || '');
   const [newBookmarkName, setNewBookmarkName] = useState('');
   const [showAddBookmark, setShowAddBookmark] = useState(false);
+
+  useEffect(() => {
+    setStartInput(startLocation?.name || '');
+  }, [startLocation]);
+
+  useEffect(() => {
+    setDestInput(destination?.name || '');
+  }, [destination]);
+
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
