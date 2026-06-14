@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { X, Copy, Check, Share2, MessageCircle } from 'lucide-react';
 
 export default function ShareEtaModal({ isOpen, onClose, destination, selectedRoute }) {

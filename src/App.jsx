@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth';
 import MapView from './components/MapView';
@@ -7,6 +7,110 @@ import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
 import { Menu } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
+
+// Speed (km/h) per travel mode — used for mock route duration estimation
+const modeSpeed = { car: 50, motorbike: 65, bicycle: 18, walk: 5 };
+
+// Format total minutes → Google Maps style: "X days Y hr Z min", "X hr Y min" or "Z min"
+const fmtDur = (totalMinutes) => {
+  const mins = Math.max(1, Math.round(totalMinutes));
+  const days = Math.floor(mins / 1440);
+  const remainingMinsAfterDays = mins % 1440;
+  const hours = Math.floor(remainingMinsAfterDays / 60);
+  const remainingMins = remainingMinsAfterDays % 60;
+
+  if (days > 0) {
+    return hours > 0 ? `${days} day${days > 1 ? 's' : ''} ${hours} hr` : `${days} day${days > 1 ? 's' : ''}`;
+  }
+  if (hours > 0) {
+    return remainingMins > 0 ? `${hours} hr ${remainingMins} min` : `${hours} hr`;
+  }
+  return `${remainingMins} min`;
+};
+
+// Generate dynamic interpolated mock routes as fallback with realistic winding curves
+const generateDynamicMockRoutes = (start, end, travelMode) => {
+  const dLng = end[0] - start[0];
+  const dLat = end[1] - start[1];
+  const distDegrees = Math.sqrt(dLng * dLng + dLat * dLat);
+
+  // Approximate distance in km (1 degree ≈ 111 km)
+  const distKm = parseFloat((distDegrees * 111 * 1.25).toFixed(1));
+
+  // Speed per mode; alternate routes are slower
+  const baseSpeed  = modeSpeed[travelMode] || 50;
+  const dur1 = Math.max(1, (distKm / baseSpeed) * 60);                  // express
+  const dur2 = Math.max(1, (distKm * 1.2) / (baseSpeed * 0.85) * 60);  // bypass
+  const dur3 = Math.max(1, (distKm * 0.95) / (baseSpeed * 0.65) * 60); // city streets
+
+  // Helper to generate a realistic winding curve between start and end
+  const generateCurvedPath = (p0, p2, offsetDirection = 0) => {
+    const points = [];
+    const steps = 30;
+    
+    const perpLng = -dLat;
+    const perpLat = dLng;
+    
+    const offsetFactor = 0.18 * offsetDirection;
+    const p1 = [
+      p0[0] + dLng * 0.5 + perpLng * offsetFactor,
+      p0[1] + dLat * 0.5 + perpLat * offsetFactor
+    ];
+    
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const u = 1 - t;
+      const tt = t * t;
+      const uu = u * u;
+      
+      const lng = uu * p0[0] + 2 * u * t * p1[0] + tt * p2[0];
+      const lat = uu * p0[1] + 2 * u * t * p1[1] + tt * p2[1];
+      
+      // Add a small sine wave wiggle to look like real winding streets
+      const frequency = 6;
+      const amplitude = 0.006 * Math.sin(t * Math.PI); // zero offset at exactly start & end
+      const waveLng = amplitude * Math.sin(t * Math.PI * frequency);
+      const waveLat = amplitude * Math.cos(t * Math.PI * frequency);
+      
+      points.push([lng + waveLng, lat + waveLat]);
+    }
+    return points;
+  };
+
+  const route1Geom = generateCurvedPath(start, end, 0.05);  // slightly curved
+  const route2Geom = generateCurvedPath(start, end, 0.35);  // curved outer route
+  const route3Geom = generateCurvedPath(start, end, -0.25); // curved inner route
+
+  return [
+    {
+      name: 'Fastest Route (Best Recommended)',
+      distance: distKm.toFixed(1) + ' km',
+      duration: fmtDur(dur1),
+      geometry: route1Geom,
+      trafficStatus: 'smooth',
+      delayInfo: null,
+      isRecommended: true
+    },
+    {
+      name: 'Alternative Route',
+      distance: (distKm * 1.2).toFixed(1) + ' km',
+      duration: fmtDur(dur2),
+      geometry: route2Geom,
+      trafficStatus: 'moderate',
+      delayInfo: 'Moderate traffic expected',
+      isRecommended: false
+    },
+    {
+      name: 'Via City Roads',
+      distance: (distKm * 0.95).toFixed(1) + ' km',
+      duration: fmtDur(dur3),
+      geometry: route3Geom,
+      trafficStatus: 'heavy',
+      delayInfo: 'Heavy urban traffic',
+      isRecommended: false
+    }
+  ];
+};
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -83,22 +187,22 @@ export default function App() {
     if (!user) {
       // Clear or reset to local storage defaults
       const savedBm = localStorage.getItem('tf_bookmarks');
-      setBookmarks(savedBm ? JSON.parse(savedBm) : []);
-      
-      setSearchHistory([
-        { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
-        { name: 'India Gate, Delhi', coordinates: [77.2295, 28.6129] },
-      ]);
-      
-      setSettings({
-        theme: localStorage.getItem('tf_theme') || 'dark',
-        googleMapsKey: localStorage.getItem('tf_google_maps_key') || '',
-        mapboxKey: localStorage.getItem('tf_mapbox_key') || '',
-        tomtomKey: localStorage.getItem('tf_tomtom_key') || '',
-        openWeatherKey: localStorage.getItem('tf_open_weather_key') || '',
-        aiProvider: localStorage.getItem('tf_ai_provider') || 'gemini',
-        aiKey: localStorage.getItem('tf_ai_key') || '',
-      });
+      setTimeout(() => {
+        setBookmarks(savedBm ? JSON.parse(savedBm) : []);
+        setSearchHistory([
+          { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
+          { name: 'India Gate, Delhi', coordinates: [77.2295, 28.6129] },
+        ]);
+        setSettings({
+          theme: localStorage.getItem('tf_theme') || 'dark',
+          googleMapsKey: localStorage.getItem('tf_google_maps_key') || '',
+          mapboxKey: localStorage.getItem('tf_mapbox_key') || '',
+          tomtomKey: localStorage.getItem('tf_tomtom_key') || '',
+          openWeatherKey: localStorage.getItem('tf_open_weather_key') || '',
+          aiProvider: localStorage.getItem('tf_ai_provider') || 'gemini',
+          aiKey: localStorage.getItem('tf_ai_key') || '',
+        });
+      }, 0);
       return;
     }
 
@@ -211,7 +315,7 @@ export default function App() {
       if (window.google) {
         delete window.google;
       }
-      setGmapsLoaded(false);
+      setTimeout(() => setGmapsLoaded(false), 0);
     }
 
     const script = document.createElement('script');
@@ -245,10 +349,12 @@ export default function App() {
         }
       );
     } else {
-      setStartLocation({
-        name: 'My Current Location (Delhi CP)',
-        coordinates: [77.2090, 28.6139]
-      });
+      setTimeout(() => {
+        setStartLocation({
+          name: 'My Current Location (Delhi CP)',
+          coordinates: [77.2090, 28.6139]
+        });
+      }, 0);
     }
   }, []);
 
@@ -386,114 +492,12 @@ export default function App() {
     return () => clearInterval(interval);
   }, [startLocation, settings.openWeatherKey]);
 
-  // Format total minutes → Google Maps style: "X days Y hr Z min", "X hr Y min" or "Z min"
-  const fmtDur = (totalMinutes) => {
-    const mins = Math.max(1, Math.round(totalMinutes));
-    const days = Math.floor(mins / 1440);
-    const remainingMinsAfterDays = mins % 1440;
-    const hours = Math.floor(remainingMinsAfterDays / 60);
-    const remainingMins = remainingMinsAfterDays % 60;
 
-    if (days > 0) {
-      return hours > 0 ? `${days} day${days > 1 ? 's' : ''} ${hours} hr` : `${days} day${days > 1 ? 's' : ''}`;
-    }
-    if (hours > 0) {
-      return remainingMins > 0 ? `${hours} hr ${remainingMins} min` : `${hours} hr`;
-    }
-    return `${remainingMins} min`;
-  };
-
-  // Speed (km/h) per travel mode — used for mock route duration estimation
-  const modeSpeed = { car: 50, motorbike: 65, bicycle: 18, walk: 5 };
-
-  // Generate dynamic interpolated mock routes as fallback with realistic winding curves
-  const generateDynamicMockRoutes = (start, end) => {
-    const dLng = end[0] - start[0];
-    const dLat = end[1] - start[1];
-    const distDegrees = Math.sqrt(dLng * dLng + dLat * dLat);
-
-    // Approximate distance in km (1 degree ≈ 111 km)
-    const distKm = parseFloat((distDegrees * 111 * 1.25).toFixed(1));
-
-    // Speed per mode; alternate routes are slower
-    const baseSpeed  = modeSpeed[travelMode] || 50;
-    const dur1 = Math.max(1, (distKm / baseSpeed) * 60);                  // express
-    const dur2 = Math.max(1, (distKm * 1.2) / (baseSpeed * 0.85) * 60);  // bypass
-    const dur3 = Math.max(1, (distKm * 0.95) / (baseSpeed * 0.65) * 60); // city streets
-
-    // Helper to generate a realistic winding curve between start and end
-    const generateCurvedPath = (p0, p2, offsetDirection = 0) => {
-      const points = [];
-      const steps = 30;
-      
-      const perpLng = -dLat;
-      const perpLat = dLng;
-      
-      const offsetFactor = 0.18 * offsetDirection;
-      const p1 = [
-        p0[0] + dLng * 0.5 + perpLng * offsetFactor,
-        p0[1] + dLat * 0.5 + perpLat * offsetFactor
-      ];
-      
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const u = 1 - t;
-        const tt = t * t;
-        const uu = u * u;
-        
-        const lng = uu * p0[0] + 2 * u * t * p1[0] + tt * p2[0];
-        const lat = uu * p0[1] + 2 * u * t * p1[1] + tt * p2[1];
-        
-        // Add a small sine wave wiggle to look like real winding streets
-        const frequency = 6;
-        const amplitude = 0.006 * Math.sin(t * Math.PI); // zero offset at exactly start & end
-        const waveLng = amplitude * Math.sin(t * Math.PI * frequency);
-        const waveLat = amplitude * Math.cos(t * Math.PI * frequency);
-        
-        points.push([lng + waveLng, lat + waveLat]);
-      }
-      return points;
-    };
-
-    const route1Geom = generateCurvedPath(start, end, 0.05);  // slightly curved
-    const route2Geom = generateCurvedPath(start, end, 0.35);  // curved outer route
-    const route3Geom = generateCurvedPath(start, end, -0.25); // curved inner route
-
-    return [
-      {
-        name: 'Fastest Route (Best Recommended)',
-        distance: distKm.toFixed(1) + ' km',
-        duration: fmtDur(dur1),
-        geometry: route1Geom,
-        trafficStatus: 'smooth',
-        delayInfo: null,
-        isRecommended: true
-      },
-      {
-        name: 'Alternative Route',
-        distance: (distKm * 1.2).toFixed(1) + ' km',
-        duration: fmtDur(dur2),
-        geometry: route2Geom,
-        trafficStatus: 'moderate',
-        delayInfo: 'Moderate traffic expected',
-        isRecommended: false
-      },
-      {
-        name: 'Via City Roads',
-        distance: (distKm * 0.95).toFixed(1) + ' km',
-        duration: fmtDur(dur3),
-        geometry: route3Geom,
-        trafficStatus: 'heavy',
-        delayInfo: 'Heavy urban traffic',
-        isRecommended: false
-      }
-    ];
-  };
 
   // Generate routes using Google Maps Directions, Mapbox, or dynamic fallback
   useEffect(() => {
     if (!destination) {
-      setRouteOptions([]);
+      setTimeout(() => setRouteOptions([]), 0);
       return;
     }
 
@@ -629,7 +633,7 @@ export default function App() {
 
           // Absolute fallback if OSRM also failed to yield enough alternative routes
           if (finalRoutes.length < 3) {
-            const mockAlternatives = generateDynamicMockRoutes(start, end);
+            const mockAlternatives = generateDynamicMockRoutes(start, end, travelMode);
             if (finalRoutes.length === 1) {
               finalRoutes.push({ ...mockAlternatives[1], isRecommended: false });
               finalRoutes.push({ ...mockAlternatives[2], isRecommended: false });
@@ -828,7 +832,7 @@ export default function App() {
       }
 
       // 4. Simulation mode fallback route data with dynamic interpolation
-      const mockRoutes = generateDynamicMockRoutes(start, end);
+      const mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
       setRouteOptions(mockRoutes);
       setSelectedRouteIndex(0);
     };

@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, Shield, MessageSquareText, HelpCircle, Trash2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, MessageSquareText, Trash2 } from 'lucide-react';
 import AiPanel from './AiPanel';
 import { incrementApiUsage } from '../utils/usage';
 
 export default function Sidebar({
   settings,
-  gmapsLoaded,
   isSidebarOpen,
   onCollapse,
   startLocation,
@@ -47,7 +46,7 @@ export default function Sidebar({
   const destInputRef = useRef(null);
 
   // Detect mobile viewport
-  const [isMobile, setIsMobile] = React.useState(() => window.innerWidth <= 640);
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 640);
     window.addEventListener('resize', handleResize);
@@ -56,15 +55,19 @@ export default function Sidebar({
 
   // Sync inputs with props
   useEffect(() => {
-    setStartInput(startLocation?.name || '');
+    setTimeout(() => {
+      setStartInput(startLocation?.name || '');
+    }, 0);
   }, [startLocation]);
 
   useEffect(() => {
-    setDestInput(destination?.name || '');
+    setTimeout(() => {
+      setDestInput(destination?.name || '');
+    }, 0);
   }, [destination]);
 
   // Query Autocomplete Suggestions from Mapbox, TomTom, or free OSM Photon
-  const queryAutocomplete = async (query, field) => {
+  const queryAutocomplete = useCallback(async (query, field) => {
     if (!query || query.trim().length < 2) {
       if (field === 'start') setStartSuggestions([]);
       if (field === 'dest') setDestSuggestions([]);
@@ -181,7 +184,7 @@ export default function Sidebar({
     } catch (e) {
       console.error('All Autocomplete options failed:', e);
     }
-  };
+  }, [startLocation, settings.mapboxKey, settings.tomtomKey]);
 
   // Debounced query trigger on input change
   useEffect(() => {
@@ -190,7 +193,7 @@ export default function Sidebar({
       queryAutocomplete(startInput, 'start');
     }, 300);
     return () => clearTimeout(timer);
-  }, [startInput, focusedField]);
+  }, [startInput, focusedField, queryAutocomplete]);
 
   useEffect(() => {
     if (focusedField !== 'dest') return;
@@ -198,7 +201,7 @@ export default function Sidebar({
       queryAutocomplete(destInput, 'dest');
     }, 300);
     return () => clearTimeout(timer);
-  }, [destInput, focusedField]);
+  }, [destInput, focusedField, queryAutocomplete]);
 
   useEffect(() => {
     if (focusedField !== 'bookmark') return;
@@ -206,7 +209,7 @@ export default function Sidebar({
       queryAutocomplete(newBookmarkAddress, 'bookmark');
     }, 300);
     return () => clearTimeout(timer);
-  }, [newBookmarkAddress, focusedField]);
+  }, [newBookmarkAddress, focusedField, queryAutocomplete]);
 
   const handleSelectSuggestion = async (suggestion, field) => {
     let coords = suggestion.coordinates;
@@ -257,8 +260,7 @@ export default function Sidebar({
     e.preventDefault();
     if (!destInput) return;
 
-    let finalStartLoc = startLocation;
-    let finalDestLoc = destination;
+
 
     // Helper geocode function
     const geocodeQuery = async (query) => {
@@ -366,7 +368,6 @@ export default function Sidebar({
     if (startInput && (!startLocation || startInput.toLowerCase() !== startLocation.name.toLowerCase())) {
       const startResult = await geocodeQuery(startInput);
       if (startResult) {
-        finalStartLoc = startResult;
         setStartLocation(startResult);
       }
     }
@@ -375,7 +376,6 @@ export default function Sidebar({
     if (destInput && (!destination || destInput.toLowerCase() !== destination.name.toLowerCase())) {
       const destResult = await geocodeQuery(destInput);
       if (destResult) {
-        finalDestLoc = destResult;
         setDestination(destResult);
       }
     } else if (destination) {

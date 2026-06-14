@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, ShieldAlert, Key, Globe, Eye, EyeOff, Check, Moon, Sun, Monitor } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, ShieldAlert, Key, Globe, Eye, EyeOff, Check, Moon, Sun } from 'lucide-react';
 import { getApiUsage, getApiLimits } from '../utils/usage';
 
 export default function SettingsModal({ isOpen, onClose, settings, onSaveSettings }) {
@@ -24,7 +24,9 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
   // Listen for usage updates while settings is open
   useEffect(() => {
     if (!isOpen) return;
-    setApiUsage(getApiUsage());
+    setTimeout(() => {
+      setApiUsage(getApiUsage());
+    }, 0);
     const handleUsageUpdate = () => {
       setApiUsage(getApiUsage());
     };
@@ -34,13 +36,15 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
 
   // Sync state if settings prop changes
   useEffect(() => {
-    setTheme(settings.theme || 'dark');
-    setGoogleMapsKey(settings.googleMapsKey || '');
-    setMapboxKey(settings.mapboxKey || '');
-    setTomtomKey(settings.tomtomKey || '');
-    setOpenWeatherKey(settings.openWeatherKey || '');
-    setAiProvider(settings.aiProvider || 'gemini');
-    setAiKey(settings.aiKey || '');
+    setTimeout(() => {
+      setTheme(settings.theme || 'dark');
+      setGoogleMapsKey(settings.googleMapsKey || '');
+      setMapboxKey(settings.mapboxKey || '');
+      setTomtomKey(settings.tomtomKey || '');
+      setOpenWeatherKey(settings.openWeatherKey || '');
+      setAiProvider(settings.aiProvider || 'gemini');
+      setAiKey(settings.aiKey || '');
+    }, 0);
   }, [settings, isOpen]);
 
   const renderUsageBar = (current, limit) => {

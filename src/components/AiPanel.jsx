@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { generateAiRouteAnalysis } from '../utils/ai';
-import { Send, Sparkles, BrainCircuit, User, Loader2, Bot } from 'lucide-react';
+import { Send, BrainCircuit, Loader2, Bot } from 'lucide-react';
 
 export default function AiPanel({ settings, startLocation, destination, routeOptions, selectedRouteIndex }) {
   const [messages, setMessages] = useState([]);
@@ -23,49 +23,49 @@ export default function AiPanel({ settings, startLocation, destination, routeOpt
       return;
     }
 
+    const triggerInitialAnalysis = async () => {
+      setGeneratingSummary(true);
+      setLoading(true);
+      try {
+        const summary = await generateAiRouteAnalysis({
+          provider: settings.aiProvider,
+          apiKey: settings.aiKey,
+          startLocation,
+          destination,
+          routeOptions,
+          selectedRouteIndex,
+          weatherCondition: localStorage.getItem('tf_weather') || 'clear'
+        });
+
+        setMessages([
+          {
+            id: 'welcome',
+            sender: 'ai',
+            text: '👋 Hello! Here is my real-time cognitive analysis of your calculated routes:',
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+          {
+            id: 'summary',
+            sender: 'ai',
+            text: summary,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }
+        ]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setGeneratingSummary(false);
+        setLoading(false);
+      }
+    };
+
     triggerInitialAnalysis();
-  }, [startLocation, destination, routeOptions, selectedRouteIndex]);
+  }, [startLocation, destination, routeOptions, selectedRouteIndex, settings.aiProvider, settings.aiKey]);
 
   // Scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
-
-  const triggerInitialAnalysis = async () => {
-    setGeneratingSummary(true);
-    setLoading(true);
-    try {
-      const summary = await generateAiRouteAnalysis({
-        provider: settings.aiProvider,
-        apiKey: settings.aiKey,
-        startLocation,
-        destination,
-        routeOptions,
-        selectedRouteIndex,
-        weatherCondition: localStorage.getItem('tf_weather') || 'clear'
-      });
-
-      setMessages([
-        {
-          id: 'welcome',
-          sender: 'ai',
-          text: '👋 Hello! Here is my real-time cognitive analysis of your calculated routes:',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-        {
-          id: 'summary',
-          sender: 'ai',
-          text: summary,
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        }
-      ]);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setGeneratingSummary(false);
-      setLoading(false);
-    }
-  };
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -161,7 +161,7 @@ Provide a concise, helpful, and localized answer based on their navigation query
     return new Promise((resolve) => {
       setTimeout(() => {
         const q = question.toLowerCase();
-        let reply = '';
+        let reply;
 
         if (q.includes('rain') || q.includes('weather') || q.includes('fog')) {
           reply = `🌧️ **Weather Impact Analysis**: On your selected route ("${selectedRoute?.name || 'Main Path'}"), rain conditions will impact braking distance. Watch out for hydroplaning on highway entrance ramps, where water accumulation is likely. High visibility headlamps are recommended.`;

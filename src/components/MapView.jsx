@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset } from 'lucide-react';
 
 // Base styles to hide Tropic of Cancer/Equator latitude lines while keeping borders
@@ -100,6 +100,16 @@ export default function MapView({
   const hasFittedBoundsRef = useRef(false);
   const lastRouteKeyRef = useRef('');
 
+  const onMapClickRef = useRef(onMapClick);
+  const onPoiClickRef = useRef(onPoiClick);
+  const onRouteSelectedRef = useRef(onRouteSelected);
+
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+    onPoiClickRef.current = onPoiClick;
+    onRouteSelectedRef.current = onRouteSelected;
+  }, [onMapClick, onPoiClick, onRouteSelected]);
+
   const timeOverlays = {
     day: 'rgba(0, 0, 0, 0)',
     sunrise: 'rgba(251, 146, 60, 0.15)', // warm orange
@@ -110,7 +120,7 @@ export default function MapView({
   // Load Google Maps JavaScript SDK when parent tells us it is loaded
   useEffect(() => {
     if (!gmapsLoaded) {
-      setMapLoaded(false);
+      setTimeout(() => setMapLoaded(false), 0);
       mapRef.current = null;
       return;
     }
@@ -132,7 +142,7 @@ export default function MapView({
 
         // Collapse sidebar on map click
         map.addListener('click', () => {
-          if (onMapClick) onMapClick();
+          if (onMapClickRef.current) onMapClickRef.current();
         });
 
         // Detect manual dragging to disable auto-follow
@@ -204,7 +214,9 @@ export default function MapView({
           }
         });
 
-        marker.addListener('click', () => onPoiClick(poi));
+        marker.addListener('click', () => {
+          if (onPoiClickRef.current) onPoiClickRef.current(poi);
+        });
         markersRef.current.push(marker);
       });
     }
@@ -330,7 +342,9 @@ export default function MapView({
       });
 
       // Click any part of the route to open sidebar
-      poly.addListener('click', () => onRouteSelected(selectedRouteIndex));
+      poly.addListener('click', () => {
+        if (onRouteSelectedRef.current) onRouteSelectedRef.current(selectedRouteIndex);
+      });
       polylinesRef.current.push(poly);
     }
 
