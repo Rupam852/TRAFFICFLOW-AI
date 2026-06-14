@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth';
 import MapView from './components/MapView';
 import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
+import NavigationHUD from './components/NavigationHUD';
 import { Menu } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
 
@@ -12,7 +13,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
   
   // Settings State
   const [settings, setSettings] = useState({
@@ -35,6 +36,13 @@ export default function App() {
   // Weather & Time States
   const [weather, setWeather] = useState(localStorage.getItem('tf_weather') || 'clear');
   const [timeOfDay, setTimeOfDay] = useState('day');
+  const [travelMode, setTravelMode] = useState('car'); // 'car' | 'motorbike' | 'bicycle' | 'walk'
+
+  // Navigation (Turn-by-Turn HUD) States
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [navMarkerPos, setNavMarkerPos] = useState(null); // [lng, lat] of moving navigator dot
+  const [navMarkerBearing, setNavMarkerBearing] = useState(null); // heading angle in degrees (0-360)
+  const lastSearchedDestNameRef = useRef(null);
 
   // Bookmarks & Search History States
   const [bookmarks, setBookmarks] = useState(() => {
@@ -55,6 +63,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareEtaOpen, setIsShareEtaOpen] = useState(false);
   const [showWarningOnLogin, setShowWarningOnLogin] = useState(false);
+  const [showApiSetupGuide, setShowApiSetupGuide] = useState(false);
 
   // Sync Supabase Auth session
   useEffect(() => {
@@ -71,10 +80,124 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Sync user database state on auth state changes
+  useEffect(() => {
+    if (!user) {
+      // Clear or reset to local storage defaults
+      const savedBm = localStorage.getItem('tf_bookmarks');
+      setBookmarks(savedBm ? JSON.parse(savedBm) : []);
+      
+      setSearchHistory([
+        { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
+        { name: 'India Gate, Delhi', coordinates: [77.2295, 28.6129] },
+      ]);
+      
+      setSettings({
+        theme: localStorage.getItem('tf_theme') || 'dark',
+        googleMapsKey: localStorage.getItem('tf_google_maps_key') || '',
+        mapboxKey: localStorage.getItem('tf_mapbox_key') || '',
+        tomtomKey: localStorage.getItem('tf_tomtom_key') || '',
+        openWeatherKey: localStorage.getItem('tf_open_weather_key') || '',
+        aiProvider: localStorage.getItem('tf_ai_provider') || 'gemini',
+        aiKey: localStorage.getItem('tf_ai_key') || '',
+      });
+      return;
+    }
+
+    const fetchUserData = async () => {
+      try {
+        // 1. Fetch user settings
+        const { data: settingsData, error: settingsError } = await supabase
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', user.id)
+          .single();
+
+        if (settingsError && settingsError.code !== 'PGRST116') {
+          console.error('Error fetching settings:', settingsError);
+        } else if (settingsData) {
+          setSettings({
+            theme: settingsData.theme || 'dark',
+            googleMapsKey: settingsData.google_maps_key || '',
+            mapboxKey: settingsData.mapbox_key || '',
+            tomtomKey: settingsData.tomtom_key || '',
+            openWeatherKey: settingsData.open_weather_key || '',
+            aiProvider: settingsData.ai_provider || 'gemini',
+            aiKey: settingsData.ai_key || '',
+          });
+        } else {
+          // No settings found, create new default settings row in Supabase
+          const defaultSettings = {
+            user_id: user.id,
+            theme: localStorage.getItem('tf_theme') || 'dark',
+            google_maps_key: localStorage.getItem('tf_google_maps_key') || '',
+            mapbox_key: localStorage.getItem('tf_mapbox_key') || '',
+            tomtom_key: localStorage.getItem('tf_tomtom_key') || '',
+            open_weather_key: localStorage.getItem('tf_open_weather_key') || '',
+            ai_provider: localStorage.getItem('tf_ai_provider') || 'gemini',
+            ai_key: localStorage.getItem('tf_ai_key') || '',
+          };
+          await supabase.from('user_settings').insert([defaultSettings]);
+        }
+
+        // 2. Fetch bookmarks
+        const { data: bookmarksData, error: bookmarksError } = await supabase
+          .from('bookmarks')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true });
+
+        if (bookmarksError) {
+          console.error('Error fetching bookmarks:', bookmarksError);
+        } else if (bookmarksData) {
+          const parsedBookmarks = bookmarksData.map(bm => ({
+            id: bm.id,
+            name: bm.name,
+            address: bm.address,
+            coordinates: Array.isArray(bm.coordinates) ? bm.coordinates : JSON.parse(bm.coordinates)
+          }));
+          setBookmarks(parsedBookmarks);
+        }
+
+        // 3. Fetch search history
+        const { data: historyData, error: historyError } = await supabase
+          .from('search_history')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (historyError) {
+          console.error('Error fetching search history:', historyError);
+        } else if (historyData && historyData.length > 0) {
+          const parsedHistory = historyData.map(h => ({
+            id: h.id,
+            name: h.name,
+            coordinates: Array.isArray(h.coordinates) ? h.coordinates : JSON.parse(h.coordinates)
+          }));
+          setSearchHistory(parsedHistory);
+        }
+      } catch (err) {
+        console.error('Failed to sync data with Supabase:', err);
+      }
+    };
+
+    fetchUserData();
+  }, [user]);
+
   // Sync theme HTML attribute
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', settings.theme);
     localStorage.setItem('tf_theme', settings.theme);
+
+    // Ensure proper mobile viewport scaling
+    let vp = document.querySelector('meta[name="viewport"]');
+    if (!vp) {
+      vp = document.createElement('meta');
+      vp.name = 'viewport';
+      document.head.appendChild(vp);
+    }
+    vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
   }, [settings.theme]);
 
   // Sync weather storage
@@ -141,6 +264,11 @@ export default function App() {
       setShowWarningOnLogin(true);
       localStorage.setItem('tf_seen_warning', 'true');
     }
+    // Show API key setup guide if not yet seen
+    const hasSeenSetup = localStorage.getItem('tf_seen_setup');
+    if (!hasSeenSetup) {
+      setShowApiSetupGuide(true);
+    }
   };
 
   const handleLogout = async () => {
@@ -148,7 +276,7 @@ export default function App() {
     setUser(null);
   };
 
-  const handleSaveSettings = (newSettings) => {
+  const handleSaveSettings = async (newSettings) => {
     setSettings(newSettings);
     localStorage.setItem('tf_theme', newSettings.theme);
     localStorage.setItem('tf_google_maps_key', newSettings.googleMapsKey || '');
@@ -157,6 +285,27 @@ export default function App() {
     localStorage.setItem('tf_open_weather_key', newSettings.openWeatherKey || '');
     localStorage.setItem('tf_ai_provider', newSettings.aiProvider);
     localStorage.setItem('tf_ai_key', newSettings.aiKey);
+
+    if (user) {
+      try {
+        const { error } = await supabase
+          .from('user_settings')
+          .upsert({
+            user_id: user.id,
+            theme: newSettings.theme,
+            google_maps_key: newSettings.googleMapsKey || '',
+            mapbox_key: newSettings.mapboxKey,
+            tomtom_key: newSettings.tomtomKey,
+            open_weather_key: newSettings.openWeatherKey || '',
+            ai_provider: newSettings.aiProvider,
+            ai_key: newSettings.aiKey,
+            updated_at: new Date().toISOString(),
+          });
+        if (error) console.error('Error saving settings to Supabase:', error);
+      } catch (err) {
+        console.error('Failed to save settings to Supabase:', err);
+      }
+    }
   };
 
   // Fetch live weather dynamically if OpenWeatherMap API key is present
@@ -222,7 +371,99 @@ export default function App() {
     return () => clearInterval(interval);
   }, [startLocation, settings.openWeatherKey]);
 
-  // Generate mock routes or fetch from Mapbox / TomTom APIs
+  // Format total minutes → Google Maps style: "X days Y hr Z min", "X hr Y min" or "Z min"
+  const fmtDur = (totalMinutes) => {
+    const mins = Math.max(1, Math.round(totalMinutes));
+    const days = Math.floor(mins / 1440);
+    const remainingMinsAfterDays = mins % 1440;
+    const hours = Math.floor(remainingMinsAfterDays / 60);
+    const remainingMins = remainingMinsAfterDays % 60;
+
+    if (days > 0) {
+      return hours > 0 ? `${days} day${days > 1 ? 's' : ''} ${hours} hr` : `${days} day${days > 1 ? 's' : ''}`;
+    }
+    if (hours > 0) {
+      return remainingMins > 0 ? `${hours} hr ${remainingMins} min` : `${hours} hr`;
+    }
+    return `${remainingMins} min`;
+  };
+
+  // Speed (km/h) per travel mode — used for mock route duration estimation
+  const modeSpeed = { car: 50, motorbike: 65, bicycle: 18, walk: 5 };
+
+  // Generate dynamic interpolated mock routes as fallback (aligned to a grid to simulate real road streets)
+  const generateDynamicMockRoutes = (start, end) => {
+    const dLng = end[0] - start[0];
+    const dLat = end[1] - start[1];
+    const distDegrees = Math.sqrt(dLng * dLng + dLat * dLat);
+
+    // Approximate distance in km (1 degree ≈ 111 km)
+    const distKm = parseFloat((distDegrees * 111 * 1.25).toFixed(1));
+
+    // Speed per mode; alternate routes are 15 % and 35 % slower (traffic)
+    const baseSpeed  = modeSpeed[travelMode] || 50;
+    const dur1 = Math.max(1, (distKm / baseSpeed) * 60);                  // express
+    const dur2 = Math.max(1, (distKm * 1.2) / (baseSpeed * 0.85) * 60);  // bypass (longer + moderate)
+    const dur3 = Math.max(1, (distKm * 0.95) / (baseSpeed * 0.65) * 60); // city streets (heavy)
+
+    // Route 1 (Express - L-shape grid path: horizontal then vertical with corner step)
+    const route1Geom = [
+      start,
+      [start[0] + dLng * 0.8, start[1]],
+      [start[0] + dLng * 0.8, start[1] + dLat * 0.95],
+      end
+    ];
+
+    // Route 2 (Bypass - outer grid path: vertical then horizontal)
+    const route2Geom = [
+      start,
+      [start[0], start[1] + dLat * 0.9],
+      [start[0] + dLng * 0.95, start[1] + dLat * 0.9],
+      end
+    ];
+
+    // Route 3 (City streets - multi-step grid staircase)
+    const route3Geom = [
+      start,
+      [start[0] + dLng * 0.35, start[1]],
+      [start[0] + dLng * 0.35, start[1] + dLat * 0.5],
+      [start[0] + dLng * 0.7, start[1] + dLat * 0.5],
+      [start[0] + dLng * 0.7, start[1] + dLat],
+      end
+    ];
+
+    return [
+      {
+        name: 'Fastest Route (Best Recommended)',
+        distance: distKm.toFixed(1) + ' km',
+        duration: fmtDur(dur1),
+        geometry: route1Geom,
+        trafficStatus: 'smooth',
+        delayInfo: null,
+        isRecommended: true
+      },
+      {
+        name: 'Alternative Route',
+        distance: (distKm * 1.2).toFixed(1) + ' km',
+        duration: fmtDur(dur2),
+        geometry: route2Geom,
+        trafficStatus: 'moderate',
+        delayInfo: 'Moderate traffic expected',
+        isRecommended: false
+      },
+      {
+        name: 'Via City Roads',
+        distance: (distKm * 0.95).toFixed(1) + ' km',
+        duration: fmtDur(dur3),
+        geometry: route3Geom,
+        trafficStatus: 'heavy',
+        delayInfo: 'Heavy urban traffic',
+        isRecommended: false
+      }
+    ];
+  };
+
+  // Generate routes using Google Maps Directions, Mapbox, or dynamic fallback
   useEffect(() => {
     if (!destination) {
       setRouteOptions([]);
@@ -233,112 +474,431 @@ export default function App() {
       const start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
       const end = destination.coordinates;
 
-      // If Mapbox key is present, we try to fetch actual coordinates
+      /**
+       * Ensure the route polyline starts exactly at `start` and ends exactly at `end`.
+       * OSRM / Mapbox snap to the nearest road which can leave a visible gap between
+       * the drawn line and the placed marker pin.
+       */
+      const pinRoute = (coords) => {
+        if (!coords || coords.length === 0) return [start, end];
+        const result = [...coords];
+        // Prepend exact start if the first point is further than ~10 m away
+        const firstPt = result[0];
+        const dFirst = Math.abs(firstPt[0] - start[0]) + Math.abs(firstPt[1] - start[1]);
+        if (dFirst > 0.00009) result.unshift([start[0], start[1]]);
+        // Append exact end if the last point is further than ~10 m away
+        const lastPt = result[result.length - 1];
+        const dLast = Math.abs(lastPt[0] - end[0]) + Math.abs(lastPt[1] - end[1]);
+        if (dLast > 0.00009) result.push([end[0], end[1]]);
+        return result;
+      };
+
+      // Helper to fetch a real road route geometry from OSRM
+      const fetchOSRMRouteGeometry = async (offsetDirection = 0, trafficMultiplier = 1) => {
+        try {
+          let osrmProfile = 'driving';
+          if (travelMode === 'bicycle') osrmProfile = 'bicycle';
+          if (travelMode === 'walk') osrmProfile = 'foot';
+
+          let url;
+          if (offsetDirection !== 0) {
+            const dLng = end[0] - start[0];
+            const dLat = end[1] - start[1];
+            const distance = Math.sqrt(dLng * dLng + dLat * dLat);
+            if (distance < 0.005) return null;
+
+            const offsetFactor = 0.15 * offsetDirection;
+            const midLng = start[0] + dLng * 0.5 - dLat * offsetFactor;
+            const midLat = start[1] + dLat * 0.5 + dLng * offsetFactor;
+            url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${start[0]},${start[1]};${midLng},${midLat};${end[0]},${end[1]}?geometries=geojson&overview=full`;
+          } else {
+            url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&overview=full`;
+          }
+
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.code === 'Ok' && data.routes && data.routes[0]) {
+            const distKm = data.routes[0].distance / 1000;
+
+            // Recalculate duration from distance × mode speed so it's always accurate
+            // (OSRM offset-waypoint routes can return incorrect times for foot/bicycle)
+            const baseSpeed = modeSpeed[travelMode] || 50; // km/h
+            const calculatedMin = (distKm / baseSpeed) * 60 * trafficMultiplier;
+
+            return {
+              geometry: pinRoute(data.routes[0].geometry.coordinates),
+              distance: distKm.toFixed(1) + ' km',
+              duration: fmtDur(calculatedMin),
+            };
+          }
+        } catch (e) {
+          console.warn('Failed to fetch OSRM route geometry:', e);
+        }
+        return null;
+      };
+
+      // Helper to fill missing alternative routes with real roads from OSRM
+      const supplementWithRealRoads = async (routesList) => {
+        let finalRoutes = [...routesList];
+        if (finalRoutes.length < 3) {
+          if (finalRoutes.length === 1) {
+            const geom1 = await fetchOSRMRouteGeometry(1, 1.2);  // moderate traffic +20%
+            if (geom1) {
+              finalRoutes.push({
+                name: 'Alternative Route',
+                distance: geom1.distance,
+                duration: geom1.duration,
+                geometry: geom1.geometry,
+                trafficStatus: 'moderate',
+                delayInfo: 'Moderate traffic expected',
+                isRecommended: false
+              });
+            }
+            const geom2 = await fetchOSRMRouteGeometry(-1, 1.4);  // heavy traffic +40%
+            if (geom2) {
+              finalRoutes.push({
+                name: 'Via City Roads',
+                distance: geom2.distance,
+                duration: geom2.duration,
+                geometry: geom2.geometry,
+                trafficStatus: 'heavy',
+                delayInfo: 'Heavy urban traffic',
+                isRecommended: false
+              });
+            }
+          } else if (finalRoutes.length === 2) {
+            const geom1 = await fetchOSRMRouteGeometry(1, 1.4);
+            if (geom1) {
+              finalRoutes.push({
+                name: 'Via City Roads',
+                distance: geom1.distance,
+                duration: geom1.duration,
+                geometry: geom1.geometry,
+                trafficStatus: 'heavy',
+                delayInfo: 'Heavy urban traffic',
+                isRecommended: false
+              });
+            }
+          }
+
+
+          // Absolute fallback if OSRM also failed to yield enough alternative routes
+          if (finalRoutes.length < 3) {
+            const mockAlternatives = generateDynamicMockRoutes(start, end);
+            if (finalRoutes.length === 1) {
+              finalRoutes.push({ ...mockAlternatives[1], isRecommended: false });
+              finalRoutes.push({ ...mockAlternatives[2], isRecommended: false });
+            } else if (finalRoutes.length === 2) {
+              finalRoutes.push({ ...mockAlternatives[2], isRecommended: false });
+            }
+          }
+        }
+        return finalRoutes;
+      };
+
+      // 1. Try Google Maps Directions Service client-side first
+      if (gmapsLoaded && window.google && window.google.maps) {
+        try {
+          const response = await new Promise((resolve, reject) => {
+            let googleMode = window.google.maps.TravelMode.DRIVING;
+            if (travelMode === 'bicycle') googleMode = window.google.maps.TravelMode.BICYCLING;
+            if (travelMode === 'walk') googleMode = window.google.maps.TravelMode.WALKING;
+
+            const directionsService = new window.google.maps.DirectionsService();
+            directionsService.route(
+              {
+                origin: new window.google.maps.LatLng(start[1], start[0]),
+                destination: new window.google.maps.LatLng(end[1], end[0]),
+                travelMode: googleMode,
+                provideRouteAlternatives: true
+              },
+              (res, status) => {
+                if (status === window.google.maps.DirectionsStatus.OK) {
+                  resolve(res);
+                } else {
+                  reject(new Error('Google Maps directions failed with status: ' + status));
+                }
+              }
+            );
+          });
+
+          if (response.routes && response.routes.length > 0) {
+            incrementApiUsage('googleMaps');
+            const routesParsed = response.routes.map((route, index) => {
+              const coords = pinRoute(route.overview_path.map(latLng => [latLng.lng(), latLng.lat()]));
+              const distanceText = route.legs[0].distance.text;
+              
+              let durationVal = route.legs[0].duration.value;
+              if (travelMode === 'motorbike') durationVal = durationVal * 0.8;
+              const durationText = fmtDur(durationVal / 60);
+              
+              let traffic = 'smooth';
+              let delay = null;
+              if (index === 1) {
+                traffic = 'moderate';
+                delay = 'Minor traffic congestion';
+              } else if (index === 2) {
+                traffic = 'heavy';
+                delay = 'Alternate route delay warning';
+              }
+
+              let routeName = route.summary 
+                ? `via ${route.summary}`
+                : index === 0 ? 'Main Route' : `Alternate Route ${index}`;
+              
+              if (index === 0) {
+                routeName += ' (Best Recommended)';
+              }
+
+              return {
+                name: routeName,
+                distance: distanceText,
+                duration: durationText,
+                geometry: coords,
+                trafficStatus: traffic,
+                delayInfo: delay,
+                isRecommended: index === 0
+              };
+            });
+
+            // Supplement routes using real roads if less than 3
+            const finalRoutes = await supplementWithRealRoads(routesParsed);
+
+            setRouteOptions(finalRoutes);
+            setSelectedRouteIndex(0);
+            return;
+          }
+        } catch (error) {
+          console.warn('Google Maps Directions Service failed, trying Mapbox API:', error);
+        }
+      }
+
+      // 2. Try Mapbox Directions API if Mapbox key is present
       if (settings.mapboxKey) {
         try {
+          let mapboxProfile = 'mapbox/driving';
+          if (travelMode === 'bicycle') mapboxProfile = 'mapbox/cycling';
+          if (travelMode === 'walk') mapboxProfile = 'mapbox/walking';
+
           const response = await fetch(
-            `https://api.mapbox.com/directions/v5/mapbox/driving/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&alternatives=true&access_token=${settings.mapboxKey}`
+            `https://api.mapbox.com/directions/v5/${mapboxProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&alternatives=true&access_token=${settings.mapboxKey}`
           );
           const data = await response.json();
           if (data.routes && data.routes.length > 0) {
             incrementApiUsage('mapbox');
             const routesParsed = data.routes.map((r, index) => {
               const distanceKm = (r.distance / 1000).toFixed(1) + ' km';
-              const durationMin = Math.round(r.duration / 60) + ' mins';
               
-              // Mocking traffic attributes based on TomTom telemetry simulation
+              const rawDuration = r.duration;
+              const adjustedDuration = travelMode === 'motorbike' ? rawDuration * 0.8 : rawDuration;
+              const durationMin = fmtDur(adjustedDuration / 60);
+              
               let traffic = 'smooth';
               let delay = '';
               if (index === 1) {
                 traffic = 'moderate';
-                delay = '4 mins congestion at Junction 12';
+                delay = '4 min congestion expected';
               } else if (index === 2) {
                 traffic = 'heavy';
-                delay = '9 mins bottleneck near central crossing';
+                delay = 'Heavy urban traffic';
               }
 
+              const routeLabels = ['Fastest Route (Best Recommended)', 'Alternative Route', 'Via City Roads'];
+              const routeName = routeLabels[index] || `Route ${index + 1}`;
+
               return {
-                name: index === 0 ? 'Express Highway (Fastest)' : index === 1 ? 'Alternate Ring Road' : 'Local City Streets',
+                name: routeName,
                 distance: distanceKm,
                 duration: durationMin,
-                geometry: r.geometry.coordinates,
+                geometry: pinRoute(r.geometry.coordinates),
                 trafficStatus: traffic,
-                delayInfo: delay
+                delayInfo: delay,
+                isRecommended: index === 0
               };
             });
-            setRouteOptions(routesParsed);
+
+            // Supplement routes using real roads if less than 3
+            const finalRoutes = await supplementWithRealRoads(routesParsed);
+
+            setRouteOptions(finalRoutes);
             setSelectedRouteIndex(0);
             return;
           }
         } catch (error) {
-          console.warn('Mapbox directions API failed, using fallback telemetry simulation:', error);
+          console.warn('Mapbox directions API failed, using fallback simulation:', error);
         }
       }
 
-      // Simulation mode fallback route data
-      const mockRoutes = [
-        {
-          name: 'NH-48 Expressway (Fastest)',
-          distance: '18.4 km',
-          duration: '22 mins',
-          geometry: [
-            start,
-            [start[0] + 0.05, start[1] + 0.02],
-            [end[0] - 0.05, end[1] - 0.02],
-            end
-          ],
-          trafficStatus: 'smooth',
-          delayInfo: null
-        },
-        {
-          name: 'Outer Bypass Ring Road',
-          distance: '21.1 km',
-          duration: '31 mins',
-          geometry: [
-            start,
-            [start[0] + 0.02, start[1] - 0.04],
-            [end[0] - 0.02, end[1] + 0.04],
-            end
-          ],
-          trafficStatus: 'moderate',
-          delayInfo: 'Minor delay at main bypass toll plaza'
-        },
-        {
-          name: 'Subhash Marg City Link',
-          distance: '15.8 km',
-          duration: '45 mins',
-          geometry: [
-            start,
-            [start[0] - 0.03, start[1] + 0.05],
-            [end[0] + 0.03, end[1] - 0.05],
-            end
-          ],
-          trafficStatus: 'heavy',
-          delayInfo: 'Heavy traffic congestion due to pipeline construction'
-        }
-      ];
+      // 3. Try free OSRM (Open Source Routing Machine) API as a high-quality fallback
+      try {
+        let osrmProfile = 'driving';
+        if (travelMode === 'bicycle') osrmProfile = 'bicycle';
+        if (travelMode === 'walk') osrmProfile = 'foot';
 
+        const response = await fetch(
+          `https://router.project-osrm.org/route/v1/${osrmProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&overview=full&alternatives=true`
+        );
+        const data = await response.json();
+        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+          const routesParsed = data.routes.map((r, index) => {
+            const distanceKm = (r.distance / 1000).toFixed(1) + ' km';
+            
+            const rawDuration = r.duration;
+            const adjustedDuration = travelMode === 'motorbike' ? rawDuration * 0.8 : rawDuration;
+            const durationMin = fmtDur(adjustedDuration / 60);
+            
+            let traffic = 'smooth';
+            let delay = null;
+            if (index === 1) {
+              traffic = 'moderate';
+              delay = 'Moderate traffic expected';
+            } else if (index === 2) {
+              traffic = 'heavy';
+              delay = 'Heavy urban traffic';
+            }
+
+            const routeLabels = ['Fastest Route (Best Recommended)', 'Alternative Route', 'Via City Roads'];
+            const routeName = routeLabels[index] || `Route ${index + 1}`;
+
+            return {
+              name: routeName,
+              distance: distanceKm,
+              duration: durationMin,
+              geometry: pinRoute(r.geometry.coordinates),
+              trafficStatus: traffic,
+              delayInfo: delay,
+              isRecommended: index === 0
+            };
+          });
+
+          // Supplement routes using real roads if less than 3
+          const finalRoutes = await supplementWithRealRoads(routesParsed);
+
+          setRouteOptions(finalRoutes);
+          setSelectedRouteIndex(0);
+          return;
+        }
+      } catch (error) {
+        console.warn('OSRM directions API failed, using fallback simulation:', error);
+      }
+
+      // 4. Simulation mode fallback route data with dynamic interpolation
+      const mockRoutes = generateDynamicMockRoutes(start, end);
       setRouteOptions(mockRoutes);
       setSelectedRouteIndex(0);
     };
 
     fetchRoutes();
 
-    // Add to search history if not duplicate
-    if (destination) {
-      setSearchHistory(prev => {
-        if (prev.some(h => h.name.toLowerCase() === destination.name.toLowerCase())) {
-          return prev;
+    // Update search history: bump to top if already exists, add if new (only if destination name has changed)
+    if (destination && destination.name !== lastSearchedDestNameRef.current) {
+      lastSearchedDestNameRef.current = destination.name;
+      const updateSearchHistory = async () => {
+        const normName = destination.name.toLowerCase().trim();
+
+        if (user) {
+          try {
+            // Delete ALL existing search history records with this name to avoid duplicates
+            await supabase
+              .from('search_history')
+              .delete()
+              .eq('user_id', user.id)
+              .ilike('name', destination.name.trim());
+
+            // Insert fresh at the top
+            const { data, error } = await supabase
+              .from('search_history')
+              .insert([{ user_id: user.id, name: destination.name, coordinates: destination.coordinates }])
+              .select();
+
+            if (!error && data && data[0]) {
+              const newItem = {
+                id: data[0].id,
+                name: data[0].name,
+                coordinates: Array.isArray(data[0].coordinates)
+                  ? data[0].coordinates
+                  : JSON.parse(data[0].coordinates),
+              };
+              // Bump to top in local state (remove old occurrences, prepend new)
+              setSearchHistory(prev => [
+                newItem,
+                ...prev.filter(h => h.name.toLowerCase().trim() !== normName).slice(0, 4),
+              ]);
+            }
+
+            // Prune to keep only 5 most recent
+            const { data: historyItems, error: fetchErr } = await supabase
+              .from('search_history')
+              .select('id')
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false });
+
+            if (!fetchErr && historyItems && historyItems.length > 5) {
+              const idsToDelete = historyItems.slice(5).map(item => item.id);
+              await supabase.from('search_history').delete().in('id', idsToDelete);
+            }
+          } catch (err) {
+            console.error('Failed to update search history in Supabase:', err);
+          }
+        } else {
+          // Local-only mode: bump to top, no duplicates
+          setSearchHistory(prev => [
+            { name: destination.name, coordinates: destination.coordinates },
+            ...prev.filter(h => h.name.toLowerCase().trim() !== normName).slice(0, 4),
+          ]);
         }
-        return [{ name: destination.name, coordinates: destination.coordinates }, ...prev.slice(0, 4)];
-      });
+      };
+      updateSearchHistory();
     }
 
-  }, [startLocation, destination, settings.mapboxKey]);
+
+  }, [startLocation, destination, settings.mapboxKey, gmapsLoaded, user, travelMode]);
+
+  // Automatically start navigation once routes are calculated
+  useEffect(() => {
+    if (routeOptions && routeOptions.length > 0) {
+      setIsNavigating(true);
+      setIsSidebarOpen(false);
+    }
+  }, [routeOptions]);
+
 
   // Bookmarks Actions
-  const handleAddBookmark = (newBm) => {
-    setBookmarks(prev => [...prev, newBm]);
+  const handleAddBookmark = async (newBm) => {
+    if (user) {
+      try {
+        const { data, error } = await supabase
+          .from('bookmarks')
+          .insert([
+            {
+              user_id: user.id,
+              name: newBm.name,
+              address: newBm.address,
+              coordinates: newBm.coordinates,
+            }
+          ])
+          .select();
+        
+        if (error) {
+          console.error('Error adding bookmark to Supabase:', error);
+          return;
+        }
+
+        if (data && data[0]) {
+          const inserted = {
+            id: data[0].id,
+            name: data[0].name,
+            address: data[0].address,
+            coordinates: data[0].coordinates
+          };
+          setBookmarks(prev => [...prev, inserted]);
+        }
+      } catch (err) {
+        console.error('Failed to save bookmark to Supabase:', err);
+      }
+    } else {
+      setBookmarks(prev => [...prev, newBm]);
+    }
   };
 
   const handleSelectBookmark = (bm) => {
@@ -346,14 +906,54 @@ export default function App() {
     setIsSidebarOpen(false);
   };
 
-  const handleRemoveBookmark = (indexToRemove) => {
-    setBookmarks(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  const handleRemoveBookmark = async (indexToRemove) => {
+    const bmToRemove = bookmarks[indexToRemove];
+    if (user && bmToRemove.id) {
+      try {
+        const { error } = await supabase
+          .from('bookmarks')
+          .delete()
+          .eq('id', bmToRemove.id);
+        
+        if (error) {
+          console.error('Error deleting bookmark from Supabase:', error);
+          return;
+        }
+        setBookmarks(prev => prev.filter((_, idx) => idx !== indexToRemove));
+      } catch (err) {
+        console.error('Failed to delete bookmark from Supabase:', err);
+      }
+    } else {
+      setBookmarks(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    }
   };
 
   // Search History Action
   const handleSelectHistory = (item) => {
     setDestination({ name: item.name, coordinates: item.coordinates });
     setIsSidebarOpen(false);
+  };
+
+  const handleRemoveHistory = async (indexToRemove) => {
+    const itemToRemove = searchHistory[indexToRemove];
+    if (user && itemToRemove.id) {
+      try {
+        const { error } = await supabase
+          .from('search_history')
+          .delete()
+          .eq('id', itemToRemove.id);
+        
+        if (error) {
+          console.error('Error deleting search history from Supabase:', error);
+          return;
+        }
+        setSearchHistory(prev => prev.filter((_, idx) => idx !== indexToRemove));
+      } catch (err) {
+        console.error('Failed to delete search history from Supabase:', err);
+      }
+    } else {
+      setSearchHistory(prev => prev.filter((_, idx) => idx !== indexToRemove));
+    }
   };
 
   // Amenities Search Action (spawns POIs on map viewport)
@@ -387,6 +987,35 @@ export default function App() {
 
   const handlePoiClick = (poi) => {
     setDestination({ name: poi.name, coordinates: poi.coordinates });
+  };
+
+  const handleStartNavigation = (routeIdx) => {
+    setSelectedRouteIndex(routeIdx);
+    setIsNavigating(true);
+    setIsSidebarOpen(false);
+  };
+
+  const handleStopNavigation = () => {
+    setIsNavigating(false);
+    setNavMarkerPos(null);
+    setNavMarkerBearing(null);
+    lastSearchedDestNameRef.current = null;
+    setDestination(null);
+    setRouteOptions([]);
+    setSelectedRouteIndex(0);
+    setIsSidebarOpen(window.innerWidth > 640);
+  };
+
+  // Called when GPS detects arrival at destination — full reset
+  const handleArrived = () => {
+    setIsNavigating(false);
+    setNavMarkerPos(null);
+    setNavMarkerBearing(null);
+    lastSearchedDestNameRef.current = null;
+    setDestination(null);
+    setRouteOptions([]);
+    setSelectedRouteIndex(0);
+    setIsSidebarOpen(window.innerWidth > 640);
   };
 
   if (authLoading) {
@@ -429,13 +1058,79 @@ export default function App() {
             <span style={styles.disclaimerEmoji}>🚨</span>
             <h3 style={styles.disclaimerTitle}>API Security Warning</h3>
             <p style={styles.disclaimerText}>
-              Welcome to TrafficFlow AI! Please note that this application allows you to connect your own keys for Mapbox, TomTom, and AI features. 
+              Welcome to TrafficFlow AI! This app uses your own API keys for Mapbox, TomTom, and AI features.
               <br /><br />
-              <strong>The developer takes no responsibility</strong> for key usage, rates, or limits. Your keys are saved only locally in your browser's Cache and are sent directly to the services.
+              <strong>The developer takes no responsibility</strong> for key usage, rates, or limits. Your keys are saved only locally in your browser and sent directly to the services.
             </p>
             <button onClick={() => setShowWarningOnLogin(false)} className="glow-btn" style={{ marginTop: '8px' }}>
-              I Understand & Agree
+              I Understand &amp; Agree
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* API Key Setup Guide — shown to new users after first login */}
+      {showApiSetupGuide && !showWarningOnLogin && (
+        <div style={styles.disclaimerBackdrop}>
+          <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0' }}>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <span style={{ fontSize: '2.5rem' }}>🔑</span>
+              <h3 style={{ ...styles.disclaimerTitle, marginTop: '8px' }}>Setup Your API Keys</h3>
+              <p style={{ ...styles.disclaimerText, marginTop: '4px' }}>
+                TrafficFlow AI needs API keys to show maps, calculate routes, and enable AI. Without them, features will be limited.
+              </p>
+            </div>
+            <div style={styles.setupKeysList}>
+              <div style={styles.setupKeyRow}>
+                <span style={styles.setupKeyIcon}>🗺️</span>
+                <div>
+                  <div style={styles.setupKeyName}>Google Maps API Key <span style={styles.setupKeyRequired}>Required</span></div>
+                  <div style={styles.setupKeyDesc}>Shows the live map, calculates real routes and directions</div>
+                </div>
+              </div>
+              <div style={styles.setupKeyRow}>
+                <span style={styles.setupKeyIcon}>🤖</span>
+                <div>
+                  <div style={styles.setupKeyName}>Gemini / OpenAI Key <span style={styles.setupKeyOptional}>Recommended</span></div>
+                  <div style={styles.setupKeyDesc}>Powers the AI traffic analyst and smart suggestions</div>
+                </div>
+              </div>
+              <div style={styles.setupKeyRow}>
+                <span style={styles.setupKeyIcon}>🌤️</span>
+                <div>
+                  <div style={styles.setupKeyName}>OpenWeatherMap Key <span style={styles.setupKeyOptional}>Optional</span></div>
+                  <div style={styles.setupKeyDesc}>Enables live weather sync and automatic day/night mode</div>
+                </div>
+              </div>
+              <div style={styles.setupKeyRow}>
+                <span style={styles.setupKeyIcon}>📍</span>
+                <div>
+                  <div style={styles.setupKeyName}>Mapbox Key <span style={styles.setupKeyOptional}>Optional</span></div>
+                  <div style={styles.setupKeyDesc}>Backup routing when Google Maps is unavailable</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'center' }}>
+              <button
+                className="glow-btn"
+                onClick={() => {
+                  localStorage.setItem('tf_seen_setup', 'true');
+                  setShowApiSetupGuide(false);
+                  setIsSettingsOpen(true);
+                }}
+              >
+                ⚙️ Open Settings
+              </button>
+              <button
+                style={styles.skipBtn}
+                onClick={() => {
+                  localStorage.setItem('tf_seen_setup', 'true');
+                  setShowApiSetupGuide(false);
+                }}
+              >
+                Skip for now
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -470,11 +1165,15 @@ export default function App() {
         onRemoveBookmark={handleRemoveBookmark}
         searchHistory={searchHistory}
         onSelectHistory={handleSelectHistory}
+        onRemoveHistory={handleRemoveHistory}
         onAmenitiesSearch={handleAmenitiesSearch}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
         user={user}
         onShareEta={() => setIsShareEtaOpen(true)}
+        travelMode={travelMode}
+        onTravelModeChange={setTravelMode}
+        onStartNavigation={handleStartNavigation}
       />
 
       <MapView
@@ -492,7 +1191,24 @@ export default function App() {
         pois={pois}
         onPoiClick={handlePoiClick}
         onMapClick={() => setIsSidebarOpen(false)}
+        navMarkerPos={navMarkerPos}
+        navMarkerBearing={navMarkerBearing}
       />
+
+      {/* Live Navigation HUD Overlay */}
+      {isNavigating && routeOptions[selectedRouteIndex] && (
+        <NavigationHUD
+          route={routeOptions[selectedRouteIndex]}
+          travelMode={travelMode}
+          destination={destination}
+          onStop={handleStopNavigation}
+          onArrived={handleArrived}
+          onPositionUpdate={(pos, bearing) => {
+            setNavMarkerPos(pos);
+            setNavMarkerBearing(bearing);
+          }}
+        />
+      )}
 
     </div>
   );
@@ -561,5 +1277,74 @@ const styles = {
     fontSize: '0.85rem',
     color: 'var(--text-secondary)',
     lineHeight: '1.5',
+  },
+  setupKeysList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    width: '100%',
+    padding: '0 4px',
+  },
+  setupKeyRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '14px',
+    padding: '12px 14px',
+    borderRadius: '10px',
+    background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(255,255,255,0.07)',
+  },
+  setupKeyIcon: {
+    fontSize: '1.4rem',
+    marginTop: '2px',
+    flexShrink: 0,
+  },
+  setupKeyName: {
+    fontSize: '0.87rem',
+    fontWeight: '700',
+    color: 'var(--text-primary)',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    flexWrap: 'wrap',
+  },
+  setupKeyDesc: {
+    fontSize: '0.75rem',
+    color: 'var(--text-muted)',
+    marginTop: '3px',
+    lineHeight: '1.4',
+  },
+  setupKeyRequired: {
+    fontSize: '0.65rem',
+    fontWeight: '700',
+    padding: '2px 7px',
+    borderRadius: '20px',
+    background: 'rgba(239,68,68,0.15)',
+    color: '#f87171',
+    border: '1px solid rgba(239,68,68,0.3)',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  setupKeyOptional: {
+    fontSize: '0.65rem',
+    fontWeight: '700',
+    padding: '2px 7px',
+    borderRadius: '20px',
+    background: 'rgba(99,102,241,0.15)',
+    color: '#a5b4fc',
+    border: '1px solid rgba(99,102,241,0.3)',
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
+  skipBtn: {
+    padding: '10px 20px',
+    borderRadius: '8px',
+    border: '1px solid var(--border-color)',
+    background: 'transparent',
+    color: 'var(--text-muted)',
+    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-sans)',
   },
 };

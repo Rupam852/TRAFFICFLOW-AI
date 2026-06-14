@@ -21,11 +21,15 @@ export default function Sidebar({
   onRemoveBookmark,
   searchHistory,
   onSelectHistory,
+  onRemoveHistory,
   onAmenitiesSearch,
   onOpenSettings,
   onLogout,
   user,
-  onShareEta
+  onShareEta,
+  travelMode,
+  onTravelModeChange,
+  onStartNavigation
 }) {
   const [activeTab, setActiveTab] = useState('nav'); // 'nav' or 'ai'
   const [startInput, setStartInput] = useState(startLocation?.name || '');
@@ -42,6 +46,14 @@ export default function Sidebar({
 
   const startInputRef = useRef(null);
   const destInputRef = useRef(null);
+
+  // Detect mobile viewport
+  const [isMobile, setIsMobile] = React.useState(() => window.innerWidth <= 640);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 640);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Sync inputs with props
   useEffect(() => {
@@ -63,6 +75,43 @@ export default function Sidebar({
 
     const trimmed = query.trim();
     const biasCoords = startLocation?.coordinates || [77.2090, 28.6139]; // Default Delhi CP coords
+
+    // 0. Try Google Places Autocomplete if loaded
+    if (window.google && window.google.maps && window.google.maps.places) {
+      try {
+        const autocompleteService = new window.google.maps.places.AutocompleteService();
+        const predictions = await new Promise((resolve, reject) => {
+          autocompleteService.getPlacePredictions(
+            {
+              input: trimmed,
+              locationBias: new window.google.maps.LatLng(biasCoords[1], biasCoords[0])
+            },
+            (predictions, status) => {
+              if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
+                resolve(predictions);
+              } else {
+                reject(new Error('Google Places Autocomplete failed with status: ' + status));
+              }
+            }
+          );
+        });
+
+        if (predictions && predictions.length > 0) {
+          incrementApiUsage('googleMaps');
+          const list = predictions.map(p => ({
+            name: p.description,
+            placeId: p.place_id,
+            isGoogle: true
+          }));
+          if (field === 'start') setStartSuggestions(list);
+          if (field === 'dest') setDestSuggestions(list);
+          if (field === 'bookmark') setBookmarkSuggestions(list);
+          return;
+        }
+      } catch (e) {
+        console.warn('Google Places Autocomplete error, falling back:', e);
+      }
+    }
 
     // 1. Try Mapbox if key is available
     if (settings.mapboxKey) {
@@ -160,19 +209,44 @@ export default function Sidebar({
     return () => clearTimeout(timer);
   }, [newBookmarkAddress, focusedField]);
 
-  const handleSelectSuggestion = (suggestion, field) => {
+  const handleSelectSuggestion = async (suggestion, field) => {
+    let coords = suggestion.coordinates;
+
+    if (suggestion.isGoogle && suggestion.placeId) {
+      try {
+        const geocoder = new window.google.maps.Geocoder();
+        const results = await new Promise((resolve, reject) => {
+          geocoder.geocode({ placeId: suggestion.placeId }, (results, status) => {
+            if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
+              resolve(results);
+            } else {
+              reject(new Error('Google Geocoder failed with status: ' + status));
+            }
+          });
+        });
+        if (results && results[0]) {
+          const loc = results[0].geometry.location;
+          coords = [loc.lng(), loc.lat()];
+        }
+      } catch (err) {
+        console.error('Failed to geocode Google Place ID:', err);
+        alert('Failed to resolve coordinates using Google Maps Geocoder. Please try again.');
+        return;
+      }
+    }
+
     if (field === 'start') {
       setStartInput(suggestion.name);
       setStartLocation({
         name: suggestion.name,
-        coordinates: suggestion.coordinates
+        coordinates: coords
       });
       setStartSuggestions([]);
     } else {
       setDestInput(suggestion.name);
       setDestination({
         name: suggestion.name,
-        coordinates: suggestion.coordinates
+        coordinates: coords
       });
       setDestSuggestions([]);
     }
@@ -191,6 +265,42 @@ export default function Sidebar({
     const geocodeQuery = async (query) => {
       const trimmed = query.trim();
       const biasCoords = startLocation?.coordinates || [77.2090, 28.6139];
+
+      // 0. Try Google Geocoder if loaded
+      if (window.google && window.google.maps) {
+        try {
+          const geocoder = new window.google.maps.Geocoder();
+          const results = await new Promise((resolve, reject) => {
+            geocoder.geocode(
+              {
+                address: trimmed,
+                bounds: new window.google.maps.LatLngBounds(
+                  new window.google.maps.LatLng(biasCoords[1] - 0.5, biasCoords[0] - 0.5),
+                  new window.google.maps.LatLng(biasCoords[1] + 0.5, biasCoords[0] + 0.5)
+                )
+              },
+              (results, status) => {
+                if (status === window.google.maps.GeocoderStatus.OK && results) {
+                  resolve(results);
+                } else {
+                  reject(new Error('Google Geocode failed with status: ' + status));
+                }
+              }
+            );
+          });
+
+          if (results && results[0]) {
+            incrementApiUsage('googleMaps');
+            const loc = results[0].geometry.location;
+            return {
+              name: results[0].formatted_address,
+              coordinates: [loc.lng(), loc.lat()]
+            };
+          }
+        } catch (err) {
+          console.warn('Geocoding with Google Maps failed, falling back:', err);
+        }
+      }
 
       // 1. Try Mapbox Geocoding
       if (settings.mapboxKey) {
@@ -317,33 +427,72 @@ export default function Sidebar({
   };
 
   return (
-    <div 
-      className="glass-panel" 
-      style={{ 
-        ...styles.sidebar, 
-        marginLeft: isSidebarOpen ? '0px' : '-400px',
-        transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-      }}
-    >
+    <>
+      {/* Mobile backdrop — tapping it closes the sidebar */}
+      {isMobile && isSidebarOpen && (
+        <div
+          className="mobile-sidebar-backdrop"
+          onClick={onCollapse}
+          style={{ display: 'block' }}
+        />
+      )}
+
+      <div
+        className={[
+          'glass-panel',
+          'sidebar-responsive',
+          isMobile ? (isSidebarOpen ? 'sidebar-open-mobile' : 'sidebar-closed-mobile') : ''
+        ].join(' ')}
+        style={{
+          ...styles.sidebar,
+          // Desktop: use margin-left slide; Mobile: handled by CSS transform
+          marginLeft: !isMobile ? (isSidebarOpen ? '0px' : '-420px') : undefined,
+          transition: isMobile
+            ? 'transform 0.32s cubic-bezier(0.4,0,0.2,1)'
+            : 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
+        }}
+      >
       {/* Brand Header */}
       <div style={styles.header}>
         <div style={styles.logoGroup}>
           <Navigation size={22} style={styles.logoIcon} />
           <h2 style={styles.logoText}>TrafficFlow <span style={styles.logoHighlight}>AI</span></h2>
         </div>
-        <button onClick={onOpenSettings} style={styles.settingsBtn} title="Settings">
-          ⚙️
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={onOpenSettings} style={styles.settingsBtn} title="Settings">
+            ⚙️
+          </button>
+          {/* Close button — only shown on mobile */}
+          <button
+            className="mobile-only"
+            onClick={onCollapse}
+            style={styles.mobileCloseBtn}
+            title="Close Menu"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       {/* User Session Profile */}
       <div style={styles.userSection}>
-        <div style={styles.avatar}>
-          {user?.email ? user.email[0].toUpperCase() : 'U'}
+        <div style={{
+          ...styles.avatar,
+          backgroundImage: user?.user_metadata?.avatar_url ? `url(${user.user_metadata.avatar_url})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          color: user?.user_metadata?.avatar_url ? 'transparent' : undefined,
+          border: user?.user_metadata?.avatar_url ? '2px solid var(--primary)' : undefined,
+        }}>
+          {!user?.user_metadata?.avatar_url && (user?.email ? user.email[0].toUpperCase() : 'U')}
         </div>
         <div style={styles.userInfo}>
-          <span style={styles.userEmail}>{user?.email || 'Guest Session'}</span>
-          <span style={styles.userRole}>Premium Account</span>
+          <span style={styles.userEmail}>
+            {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Guest Session'}
+          </span>
+          <span style={styles.userRole}>
+            {user?.user_metadata?.full_name || user?.user_metadata?.name ? user.email : 'Premium Account'}
+          </span>
         </div>
         <button onClick={onLogout} style={styles.logoutBtn} title="Sign Out">
           🚪
@@ -581,8 +730,22 @@ export default function Sidebar({
                       }}
                       style={styles.historyItem}
                     >
-                      <History size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span style={styles.historyName}>{item.name}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, overflow: 'hidden' }}>
+                        <History size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+                        <span style={{ ...styles.historyName, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {item.name}
+                        </span>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveHistory(index);
+                        }}
+                        className="delete-bookmark-btn"
+                        title="Delete Search History"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))
                 )}
@@ -617,9 +780,21 @@ export default function Sidebar({
               <div style={styles.section}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <span style={styles.sectionTitle}>Calculated Routes</span>
-                  <button onClick={onShareEta} className="glow-btn" style={styles.shareBtn}>
-                    Share ETA
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <select
+                      value={travelMode}
+                      onChange={(e) => onTravelModeChange(e.target.value)}
+                      style={styles.modeSelect}
+                    >
+                      <option value="car">🚗 Car</option>
+                      <option value="motorbike">🏍️ Motorbike</option>
+                      <option value="bicycle">🚲 Bicycle</option>
+                      <option value="walk">🚶 Walk</option>
+                    </select>
+                    <button onClick={onShareEta} className="glow-btn" style={styles.shareBtn}>
+                      Share ETA
+                    </button>
+                  </div>
                 </div>
                 <div style={styles.routesList}>
                   {routeOptions.map((route, idx) => {
@@ -642,9 +817,14 @@ export default function Sidebar({
                       >
                         <div style={styles.routeHeader}>
                           <span style={styles.routeName}>{route.name}</span>
-                          <span style={{ ...styles.trafficBadge, backgroundColor: statusColor }}>
-                            {route.trafficStatus.toUpperCase()}
-                          </span>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            {route.isRecommended && (
+                              <span style={styles.recommendedBadge}>RECOMMENDED</span>
+                            )}
+                            <span style={{ ...styles.trafficBadge, backgroundColor: statusColor }}>
+                              {route.trafficStatus.toUpperCase()}
+                            </span>
+                          </div>
                         </div>
                         <div style={styles.routeStats}>
                           <span style={styles.routeStatVal}>{route.duration}</span>
@@ -652,7 +832,7 @@ export default function Sidebar({
                           <span>{route.distance}</span>
                         </div>
                         {route.delayInfo && (
-                          <span style={styles.delayText}>⚠️ {route.delayInfo}</span>
+                          <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
                         )}
                       </div>
                     );
@@ -674,6 +854,7 @@ export default function Sidebar({
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -690,7 +871,7 @@ const styles = {
     borderBottomRightRadius: '16px',
     borderLeft: 'none',
     zIndex: 200,
-    animation: 'slideInLeft 0.4s ease',
+    flexShrink: 0,
   },
   header: {
     display: 'flex',
@@ -927,6 +1108,16 @@ const styles = {
     padding: '2px 6px',
     borderRadius: '4px',
   },
+  recommendedBadge: {
+    fontSize: '0.6rem',
+    fontWeight: '800',
+    color: '#ffffff',
+    background: 'linear-gradient(135deg, #a855f7 0%, #6366f1 100%)',
+    padding: '2px 6px',
+    borderRadius: '4px',
+    boxShadow: '0 0 8px rgba(168, 85, 247, 0.4)',
+    letterSpacing: '0.05em',
+  },
   routeStats: {
     display: 'flex',
     gap: '8px',
@@ -1073,5 +1264,44 @@ const styles = {
     color: 'var(--text-muted)',
     fontStyle: 'italic',
     padding: '4px 0',
+  },
+  modeSelect: {
+    padding: '4px 8px',
+    borderRadius: '6px',
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-tertiary)',
+    color: 'var(--text-primary)',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    outline: 'none',
+    cursor: 'pointer',
+    transition: 'var(--transition-fast)',
+  },
+  startNavBtn: {
+    marginTop: '10px',
+    width: '100%',
+    padding: '10px 0',
+    borderRadius: '8px',
+    border: 'none',
+    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+    color: '#fff',
+    fontSize: '0.82rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    letterSpacing: '0.04em',
+    transition: 'opacity 0.2s',
+    boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+  },
+  mobileCloseBtn: {
+    background: 'rgba(239,68,68,0.12)',
+    border: '1px solid rgba(239,68,68,0.3)',
+    color: '#f87171',
+    borderRadius: '8px',
+    padding: '5px 10px',
+    cursor: 'pointer',
+    fontSize: '1rem',
+    fontWeight: '700',
+    lineHeight: 1,
+    transition: 'var(--transition-fast)',
   },
 };

@@ -50,6 +50,7 @@ const googleMapsDarkStyles = [
 
 export default function MapView({
   settings,
+  gmapsLoaded,
   startLocation,
   destination,
   routeOptions,
@@ -61,13 +62,16 @@ export default function MapView({
   setTimeOfDay,
   pois,
   onPoiClick,
-  onMapClick
+  onMapClick,
+  navMarkerPos,
+  navMarkerBearing,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
   const polylinesRef = useRef([]);
+  const navMarkerRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [gmapsError, setGmapsError] = useState(false);
 
@@ -78,8 +82,14 @@ export default function MapView({
     night: 'rgba(15, 23, 42, 0.45)',     // dark night
   };
 
-  // Load Google Maps JavaScript SDK
+  // Load Google Maps JavaScript SDK when parent tells us it is loaded
   useEffect(() => {
+    if (!gmapsLoaded) {
+      setMapLoaded(false);
+      mapRef.current = null;
+      return;
+    }
+
     const initGoogleMap = () => {
       if (!mapContainerRef.current) return;
 
@@ -94,10 +104,6 @@ export default function MapView({
           streetViewControl: false,
           fullscreenControl: false,
         });
-
-        // Enable real-time traffic highlights via Google's Traffic Layer
-        const trafficLayer = new window.google.maps.TrafficLayer();
-        trafficLayer.setMap(map);
 
         // Collapse sidebar on map click
         map.addListener('click', () => {
@@ -116,31 +122,20 @@ export default function MapView({
     if (window.google && window.google.maps) {
       initGoogleMap();
     } else {
-      const existingScript = document.getElementById('google-maps-sdk');
-      if (existingScript) {
-        existingScript.onload = () => initGoogleMap();
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.id = 'google-maps-sdk';
-      // Load public SDK keyless if key is missing
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.googleMapsKey || ''}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        initGoogleMap();
-      };
-      script.onerror = () => {
-        setGmapsError(true);
-      };
-      document.head.appendChild(script);
+      // Fallback: wait briefly or retry in case it's in a transitional state
+      const interval = setInterval(() => {
+        if (window.google && window.google.maps) {
+          initGoogleMap();
+          clearInterval(interval);
+        }
+      }, 100);
+      return () => clearInterval(interval);
     }
-  }, [settings.theme, settings.googleMapsKey]);
+  }, [gmapsLoaded, settings.theme]);
 
   // Handle drawing markers, routes, and POIs on the Google Map
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current) return;
+    if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
     const map = mapRef.current;
 
     // Clear old markers
@@ -178,7 +173,7 @@ export default function MapView({
     }
 
     // Render Start Pin if available
-    const startLatLng = startLocation?.coordinates 
+    const startLatLng = startLocation?.coordinates
       ? { lat: startLocation.coordinates[1], lng: startLocation.coordinates[0] }
       : null;
 
@@ -186,15 +181,16 @@ export default function MapView({
       const startMarker = new window.google.maps.Marker({
         position: startLatLng,
         map: map,
-        title: startLocation?.name || "Start Location",
+        title: startLocation?.name || 'Start Location',
+        zIndex: 50,
         icon: {
           path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 8,
-          fillColor: '#4f46e5',
+          scale: 9,
+          fillColor: '#6366f1',
           fillOpacity: 1,
           strokeColor: '#ffffff',
-          strokeWeight: 2,
-        }
+          strokeWeight: 3,
+        },
       });
       markersRef.current.push(startMarker);
       map.panTo(startLatLng);
@@ -204,73 +200,143 @@ export default function MapView({
 
     const endLatLng = { lat: destination.coordinates[1], lng: destination.coordinates[0] };
 
+    // Destination circle marker
     const endMarker = new window.google.maps.Marker({
       position: endLatLng,
       map: map,
       title: destination.name,
+      zIndex: 50,
       icon: {
         path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 8,
+        scale: 9,
         fillColor: '#06b6d4',
         fillOpacity: 1,
         strokeColor: '#ffffff',
-        strokeWeight: 2,
-      }
+        strokeWeight: 3,
+      },
     });
     markersRef.current.push(endMarker);
 
-    // Fit map bounds
+    // Fit map bounds to show both markers
     const bounds = new window.google.maps.LatLngBounds();
     bounds.extend(startLatLng);
     bounds.extend(endLatLng);
     map.fitBounds(bounds);
 
-    // Draw Calculated Alternative Routes
+
+    // Draw only the selected route — alternatives are shown in the sidebar
     if (routeOptions && routeOptions.length > 0) {
-      routeOptions.forEach((route, idx) => {
-        const isSelected = idx === selectedRouteIndex;
+      const route = routeOptions[selectedRouteIndex];
+      if (!route) return;
 
-        let routeColor = 'var(--traffic-smooth)';
-        if (route.trafficStatus === 'moderate') routeColor = 'var(--traffic-moderate)';
-        if (route.trafficStatus === 'heavy') routeColor = 'var(--traffic-heavy)';
-        if (route.trafficStatus === 'blocked') routeColor = 'var(--traffic-blocked)';
+      const routeColor = '#3b82f6';
 
-        const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
+      const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
 
-        // Outline white backdrop for selected route
-        if (isSelected) {
-          const outlinePoly = new window.google.maps.Polyline({
-            path: pathCoords,
-            geodesic: true,
-            strokeColor: '#ffffff',
-            strokeOpacity: 0.7,
-            strokeWeight: 8,
-            map: map,
-            zIndex: 10
-          });
-          polylinesRef.current.push(outlinePoly);
-        }
-
-        const poly = new window.google.maps.Polyline({
-          path: pathCoords,
+      // Dashed connector: start marker → first route point
+      if (startLatLng && pathCoords.length > 0) {
+        const startConnector = new window.google.maps.Polyline({
+          path: [startLatLng, pathCoords[0]],
           geodesic: true,
-          strokeColor: isSelected ? routeColor : 'rgba(148, 163, 184, 0.5)',
-          strokeOpacity: isSelected ? 1.0 : 0.6,
-          strokeWeight: isSelected ? 5 : 4,
-          map: map,
-          zIndex: isSelected ? 20 : 5
+          strokeColor: routeColor,
+          strokeOpacity: 0.7,
+          strokeWeight: 2,
+          icons: [{
+            icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+            offset: '0', repeat: '10px',
+          }],
+          map, zIndex: 15,
         });
+        polylinesRef.current.push(startConnector);
+      }
 
-        // Toggle selected route on line click
-        poly.addListener('click', () => {
-          onRouteSelected(idx);
+      // Dashed connector: last route point → destination marker
+      if (pathCoords.length > 0) {
+        const endConnector = new window.google.maps.Polyline({
+          path: [pathCoords[pathCoords.length - 1], endLatLng],
+          geodesic: true,
+          strokeColor: routeColor,
+          strokeOpacity: 0.7,
+          strokeWeight: 2,
+          icons: [{
+            icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+            offset: '0', repeat: '10px',
+          }],
+          map, zIndex: 15,
         });
+        polylinesRef.current.push(endConnector);
+      }
 
-        polylinesRef.current.push(poly);
+      // White outline backdrop
+      const outlinePoly = new window.google.maps.Polyline({
+        path: pathCoords,
+        geodesic: true,
+        strokeColor: '#ffffff',
+        strokeOpacity: 0.6,
+        strokeWeight: 9,
+        map, zIndex: 10,
       });
+      polylinesRef.current.push(outlinePoly);
+
+      // Main coloured route line
+      const poly = new window.google.maps.Polyline({
+        path: pathCoords,
+        geodesic: true,
+        strokeColor: routeColor,
+        strokeOpacity: 1.0,
+        strokeWeight: 6,
+        map, zIndex: 20,
+      });
+
+      // Click any part of the route to open sidebar
+      poly.addListener('click', () => onRouteSelected(selectedRouteIndex));
+      polylinesRef.current.push(poly);
     }
 
+
+
   }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois]);
+
+  // Move navigator dot on the map when position updates
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
+    if (!navMarkerPos) {
+      if (navMarkerRef.current) {
+        navMarkerRef.current.setMap(null);
+        navMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
+    const hasBearing = navMarkerBearing !== undefined && navMarkerBearing !== null;
+
+    const markerIcon = {
+      path: hasBearing ? window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW : window.google.maps.SymbolPath.CIRCLE,
+      scale: hasBearing ? 8 : 10,
+      fillColor: '#3b82f6', // Professional Royal Blue for navigator
+      fillOpacity: 1,
+      strokeColor: '#ffffff',
+      strokeWeight: 2.5,
+      rotation: hasBearing ? navMarkerBearing : 0,
+    };
+
+    if (!navMarkerRef.current) {
+      navMarkerRef.current = new window.google.maps.Marker({
+        position: latlng,
+        map: mapRef.current,
+        title: 'You are here',
+        icon: markerIcon,
+        zIndex: 999,
+      });
+    } else {
+      navMarkerRef.current.setPosition(latlng);
+      navMarkerRef.current.setIcon(markerIcon);
+    }
+
+    // Smoothly pan map to follow the navigator
+    mapRef.current.panTo(latlng);
+  }, [navMarkerPos, navMarkerBearing, mapLoaded]);
 
   // Weather Animations Loop (HTML5 Canvas overlay)
   useEffect(() => {
@@ -396,29 +462,35 @@ export default function MapView({
       />
 
       {/* Map Control Widget: Weather & Day/Night Toggle */}
-      <div className="glass-panel" style={styles.weatherWidget}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <span style={{ ...styles.widgetHeader, marginBottom: 0 }}>Climate & Time Engine</span>
-          {settings.openWeatherKey && (
-            <span 
-              style={{ 
-                fontSize: '0.65rem', 
-                color: 'var(--traffic-smooth)', 
-                fontWeight: '800', 
-                textTransform: 'uppercase', 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '4px',
+      <div className="glass-panel weather-widget-responsive" style={styles.weatherWidget}>
+
+        {/* Live Auto badge — top line, always visible */}
+        {settings.openWeatherKey && (
+          <div style={{ marginBottom: '8px' }}>
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                fontSize: '0.68rem',
+                fontWeight: '800',
+                color: 'var(--traffic-smooth)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
                 backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                padding: '2px 6px',
-                borderRadius: '4px',
-                border: '1px solid rgba(16, 185, 129, 0.25)',
+                padding: '3px 8px',
+                borderRadius: '20px',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
               }}
               title="Live Weather & Day-Night cycle syncing automatically via OpenWeatherMap"
             >
-              🟢 Live Auto
+              🟢 Live · Auto
             </span>
-          )}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <span style={{ ...styles.widgetHeader, marginBottom: 0 }}>Climate & Time Engine</span>
         </div>
         
         <div style={styles.widgetGroup}>
