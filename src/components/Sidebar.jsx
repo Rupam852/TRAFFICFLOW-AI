@@ -159,17 +159,97 @@ export default function Sidebar({
   };
 
 
-  const handleSearchSubmit = (e) => {
+  const handleSearchSubmit = async (e) => {
     e.preventDefault();
     if (!destInput) return;
 
-    // Set mock coordinates or trigger search
-    // In Simulation Mode, we use mock Delhi / Noida coords
-    const startCoord = startLocation?.coordinates || [77.2090, 28.6139]; // Default Delhi CP
-    const destCoord = [77.3910, 28.5708]; // Default Noida
+    let finalStartLoc = startLocation;
+    let finalDestLoc = destination;
 
-    setStartLocation({ name: startInput || 'My Current Location (Delhi CP)', coordinates: startCoord });
-    setDestination({ name: destInput, coordinates: destCoord });
+    // Helper geocode function
+    const geocodeQuery = async (query) => {
+      const trimmed = query.trim();
+      const biasCoords = startLocation?.coordinates || [77.2090, 28.6139];
+
+      // 1. Try Mapbox Geocoding
+      if (settings.mapboxKey) {
+        try {
+          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${settings.mapboxKey}&limit=1&proximity=${biasCoords[0]},${biasCoords[1]}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.features && data.features.length > 0) {
+            return {
+              name: data.features[0].place_name,
+              coordinates: data.features[0].geometry.coordinates
+            };
+          }
+        } catch (err) {
+          console.warn('Geocoding with Mapbox failed:', err);
+        }
+      }
+
+      // 2. Try TomTom Geocoding
+      if (settings.tomtomKey) {
+        try {
+          const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(trimmed)}.json?key=${settings.tomtomKey}&limit=1&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
+          const res = await fetch(url);
+          const data = await res.json();
+          if (data.results && data.results.length > 0) {
+            return {
+              name: data.results[0].address.freeformAddress,
+              coordinates: [data.results[0].position.lon, data.results[0].position.lat]
+            };
+          }
+        } catch (err) {
+          console.warn('Geocoding with TomTom failed:', err);
+        }
+      }
+
+      // 3. Fallback: OSM Photon
+      try {
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed)}&limit=1&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          const f = data.features[0];
+          const props = f.properties;
+          const parts = [];
+          if (props.name) parts.push(props.name);
+          if (props.city && props.city !== props.name) parts.push(props.city);
+          if (props.state && props.state !== props.name && props.state !== props.city) parts.push(props.state);
+          if (props.country) parts.push(props.country);
+          return {
+            name: parts.join(', '),
+            coordinates: f.geometry.coordinates
+          };
+        }
+      } catch (err) {
+        console.error('All geocoding options failed:', err);
+      }
+
+      return null;
+    };
+
+    // If start input has been changed and doesn't match startLocation, geocode it
+    if (startInput && (!startLocation || startInput.toLowerCase() !== startLocation.name.toLowerCase())) {
+      const startResult = await geocodeQuery(startInput);
+      if (startResult) {
+        finalStartLoc = startResult;
+        setStartLocation(startResult);
+      }
+    }
+
+    // If dest input has been changed and doesn't match destination, geocode it
+    if (destInput && (!destination || destInput.toLowerCase() !== destination.name.toLowerCase())) {
+      const destResult = await geocodeQuery(destInput);
+      if (destResult) {
+        finalDestLoc = destResult;
+        setDestination(destResult);
+      }
+    } else if (destination) {
+      // If destination is already set from selection, update it to trigger route updates in App.jsx
+      setDestination({ ...destination });
+    }
   };
 
   const handleQuickAmenity = (type) => {
