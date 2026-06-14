@@ -29,6 +29,10 @@ export default function Sidebar({
   const [newBookmarkName, setNewBookmarkName] = useState('');
   const [showAddBookmark, setShowAddBookmark] = useState(false);
 
+  const [startSuggestions, setStartSuggestions] = useState([]);
+  const [destSuggestions, setDestSuggestions] = useState([]);
+  const [focusedField, setFocusedField] = useState(null);
+
   const startInputRef = useRef(null);
   const destInputRef = useRef(null);
 
@@ -41,59 +45,118 @@ export default function Sidebar({
     setDestInput(destination?.name || '');
   }, [destination]);
 
-  // Bind Google Places Autocomplete to inputs when API script loads
-  useEffect(() => {
-    if (!gmapsLoaded || !window.google || !window.google.maps || !window.google.maps.places) return;
-
-    let startAutocomplete = null;
-    let destAutocomplete = null;
-
-    if (startInputRef.current) {
-      startAutocomplete = new window.google.maps.places.Autocomplete(startInputRef.current, {
-        fields: ['geometry', 'name', 'formatted_address']
-      });
-      startAutocomplete.addListener('place_changed', () => {
-        const place = startAutocomplete.getPlace();
-        if (place.geometry && place.geometry.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const nameStr = place.name || place.formatted_address;
-          setStartInput(nameStr);
-          setStartLocation({
-            name: nameStr,
-            coordinates: [lng, lat]
-          });
-        }
-      });
+  // Query Autocomplete Suggestions from Mapbox, TomTom, or free OSM Photon
+  const queryAutocomplete = async (query, field) => {
+    if (!query || query.trim().length < 2) {
+      if (field === 'start') setStartSuggestions([]);
+      if (field === 'dest') setDestSuggestions([]);
+      return;
     }
 
-    if (destInputRef.current) {
-      destAutocomplete = new window.google.maps.places.Autocomplete(destInputRef.current, {
-        fields: ['geometry', 'name', 'formatted_address']
-      });
-      destAutocomplete.addListener('place_changed', () => {
-        const place = destAutocomplete.getPlace();
-        if (place.geometry && place.geometry.location) {
-          const lat = place.geometry.location.lat();
-          const lng = place.geometry.location.lng();
-          const nameStr = place.name || place.formatted_address;
-          setDestInput(nameStr);
-          setDestination({
-            name: nameStr,
-            coordinates: [lng, lat]
-          });
-        }
-      });
-    }
+    const trimmed = query.trim();
+    const biasCoords = startLocation?.coordinates || [77.2090, 28.6139]; // Default Delhi CP coords
 
-    // Cleanup listeners
-    return () => {
-      if (window.google && window.google.maps && window.google.maps.event) {
-        if (startAutocomplete) window.google.maps.event.clearInstanceListeners(startAutocomplete);
-        if (destAutocomplete) window.google.maps.event.clearInstanceListeners(destAutocomplete);
+    // 1. Try Mapbox if key is available
+    if (settings.mapboxKey) {
+      try {
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${settings.mapboxKey}&limit=5&proximity=${biasCoords[0]},${biasCoords[1]}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.features && data.features.length > 0) {
+          const list = data.features.map(f => ({
+            name: f.place_name,
+            coordinates: f.geometry.coordinates
+          }));
+          if (field === 'start') setStartSuggestions(list);
+          if (field === 'dest') setDestSuggestions(list);
+          return;
+        }
+      } catch (e) {
+        console.warn('Mapbox Autocomplete error, falling back:', e);
       }
-    };
-  }, [gmapsLoaded]);
+    }
+
+    // 2. Try TomTom if key is available
+    if (settings.tomtomKey) {
+      try {
+        const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(trimmed)}.json?key=${settings.tomtomKey}&limit=5&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        if (data.results && data.results.length > 0) {
+          const list = data.results.map(r => ({
+            name: r.address.freeformAddress,
+            coordinates: [r.position.lon, r.position.lat]
+          }));
+          if (field === 'start') setStartSuggestions(list);
+          if (field === 'dest') setDestSuggestions(list);
+          return;
+        }
+      } catch (e) {
+        console.warn('TomTom Autocomplete error, falling back:', e);
+      }
+    }
+
+    // 3. Fallback: Komoot Photon API (free, OSM-based)
+    try {
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed)}&limit=5&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      if (data.features && data.features.length > 0) {
+        const list = data.features.map(f => {
+          const props = f.properties;
+          const parts = [];
+          if (props.name) parts.push(props.name);
+          if (props.city && props.city !== props.name) parts.push(props.city);
+          if (props.state && props.state !== props.name && props.state !== props.city) parts.push(props.state);
+          if (props.country) parts.push(props.country);
+          return {
+            name: parts.join(', '),
+            coordinates: f.geometry.coordinates
+          };
+        });
+        if (field === 'start') setStartSuggestions(list);
+        if (field === 'dest') setDestSuggestions(list);
+      }
+    } catch (e) {
+      console.error('All Autocomplete options failed:', e);
+    }
+  };
+
+  // Debounced query trigger on input change
+  useEffect(() => {
+    if (focusedField !== 'start') return;
+    const timer = setTimeout(() => {
+      queryAutocomplete(startInput, 'start');
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [startInput, focusedField]);
+
+  useEffect(() => {
+    if (focusedField !== 'dest') return;
+    const timer = setTimeout(() => {
+      queryAutocomplete(destInput, 'dest');
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [destInput, focusedField]);
+
+  const handleSelectSuggestion = (suggestion, field) => {
+    if (field === 'start') {
+      setStartInput(suggestion.name);
+      setStartLocation({
+        name: suggestion.name,
+        coordinates: suggestion.coordinates
+      });
+      setStartSuggestions([]);
+    } else {
+      setDestInput(suggestion.name);
+      setDestination({
+        name: suggestion.name,
+        coordinates: suggestion.coordinates
+      });
+      setDestSuggestions([]);
+    }
+    setFocusedField(null);
+  };
 
 
   const handleSearchSubmit = (e) => {
@@ -188,29 +251,71 @@ export default function Sidebar({
               <div style={styles.searchWrapper}>
                 <div style={styles.searchLine} />
                 
-                <div style={styles.searchFieldGroup}>
-                  <MapPin size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                  <input
-                    ref={startInputRef}
-                    type="text"
-                    placeholder="Enter starting location..."
-                    value={startInput}
-                    onChange={(e) => setStartInput(e.target.value)}
-                    style={styles.searchInput}
-                  />
+                <div style={{ position: 'relative', zIndex: 10 }}>
+                  <div style={styles.searchFieldGroup}>
+                    <MapPin size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                    <input
+                      ref={startInputRef}
+                      type="text"
+                      placeholder="Enter starting location..."
+                      value={startInput}
+                      onChange={(e) => {
+                        setStartInput(e.target.value);
+                        setFocusedField('start');
+                      }}
+                      onFocus={() => setFocusedField('start')}
+                      onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                      style={styles.searchInput}
+                    />
+                  </div>
+                  {focusedField === 'start' && startSuggestions.length > 0 && (
+                    <div className="suggestions-dropdown">
+                      {startSuggestions.map((s, idx) => (
+                        <div
+                          key={idx}
+                          onMouseDown={() => handleSelectSuggestion(s, 'start')}
+                          className="suggestion-item"
+                        >
+                          <MapPin size={12} className="suggestion-icon" style={{ color: 'var(--primary)' }} />
+                          <span className="suggestion-text">{s.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                <div style={styles.searchFieldGroup}>
-                  <Navigation size={16} style={{ color: 'var(--accent)', flexShrink: 0, transform: 'rotate(45deg)' }} />
-                  <input
-                    ref={destInputRef}
-                    type="text"
-                    placeholder="Where to?"
-                    value={destInput}
-                    onChange={(e) => setDestInput(e.target.value)}
-                    style={styles.searchInput}
-                    required
-                  />
+                <div style={{ position: 'relative', zIndex: 9 }}>
+                  <div style={styles.searchFieldGroup}>
+                    <Navigation size={16} style={{ color: 'var(--accent)', flexShrink: 0, transform: 'rotate(45deg)' }} />
+                    <input
+                      ref={destInputRef}
+                      type="text"
+                      placeholder="Where to?"
+                      value={destInput}
+                      onChange={(e) => {
+                        setDestInput(e.target.value);
+                        setFocusedField('dest');
+                      }}
+                      onFocus={() => setFocusedField('dest')}
+                      onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                      style={styles.searchInput}
+                      required
+                    />
+                  </div>
+                  {focusedField === 'dest' && destSuggestions.length > 0 && (
+                    <div className="suggestions-dropdown">
+                      {destSuggestions.map((s, idx) => (
+                        <div
+                          key={idx}
+                          onMouseDown={() => handleSelectSuggestion(s, 'dest')}
+                          className="suggestion-item"
+                        >
+                          <Navigation size={12} className="suggestion-icon" style={{ color: 'var(--accent)', transform: 'rotate(45deg)' }} />
+                          <span className="suggestion-text">{s.name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
