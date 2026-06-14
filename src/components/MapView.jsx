@@ -95,6 +95,7 @@ export default function MapView({
   const navMarkerRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [gmapsError, setGmapsError] = useState(false);
+  const [autoFollow, setAutoFollow] = useState(true);
 
   // Refs to track map boundary updates and avoid jumping zoom loops
   const hasFittedBoundsRef = useRef(false);
@@ -133,6 +134,11 @@ export default function MapView({
         // Collapse sidebar on map click
         map.addListener('click', () => {
           if (onMapClick) onMapClick();
+        });
+
+        // Detect manual dragging to disable auto-follow
+        map.addListener('dragstart', () => {
+          setAutoFollow(false);
         });
 
         mapRef.current = map;
@@ -251,13 +257,12 @@ export default function MapView({
     });
     markersRef.current.push(endMarker);
 
-    // Fit map bounds to show both markers only once per route to avoid jumping zoom during active navigation
-    if (startLatLng && endLatLng && !hasFittedBoundsRef.current && !isNavigating) {
-      const bounds = new window.google.maps.LatLngBounds();
-      bounds.extend(startLatLng);
-      bounds.extend(endLatLng);
-      map.fitBounds(bounds);
+    // Center on start location and zoom in close when route is decided, as requested
+    if (startLatLng && !hasFittedBoundsRef.current) {
+      map.setCenter(startLatLng);
+      map.setZoom(15);
       hasFittedBoundsRef.current = true;
+      setAutoFollow(true); // Reset auto-follow when a new route is decided
     }
 
 
@@ -366,14 +371,18 @@ export default function MapView({
         icon: markerIcon,
         zIndex: 999,
       });
+      mapRef.current.setZoom(16);
+      setAutoFollow(true);
     } else {
       navMarkerRef.current.setPosition(latlng);
       navMarkerRef.current.setIcon(markerIcon);
     }
 
-    // Smoothly pan map to follow the navigator
-    mapRef.current.panTo(latlng);
-  }, [navMarkerPos, navMarkerBearing, mapLoaded]);
+    // Smoothly pan map to follow the navigator if autoFollow is active
+    if (autoFollow) {
+      mapRef.current.panTo(latlng);
+    }
+  }, [navMarkerPos, navMarkerBearing, mapLoaded, autoFollow]);
 
   // Weather Animations Loop (HTML5 Canvas overlay)
   useEffect(() => {
@@ -576,6 +585,24 @@ export default function MapView({
           </div>
         </div>
       </div>
+
+      {/* Floating Recenter Map Button */}
+      {!autoFollow && navMarkerPos && (
+        <button
+          onClick={() => {
+            setAutoFollow(true);
+            if (mapRef.current && navMarkerPos) {
+              const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
+              mapRef.current.panTo(latlng);
+              mapRef.current.setZoom(16);
+            }
+          }}
+          className="glass-panel glow-btn"
+          style={styles.recenterBtn}
+        >
+          🎯 Recenter Map
+        </button>
+      )}
     </div>
   );
 }
@@ -647,5 +674,24 @@ const styles = {
     alignItems: 'center',
     gap: '4px',
     transition: 'var(--transition-smooth)',
+  },
+  recenterBtn: {
+    position: 'absolute',
+    top: '20px',
+    right: '20px',
+    padding: '10px 16px',
+    borderRadius: '10px',
+    fontSize: '0.8rem',
+    fontWeight: '700',
+    cursor: 'pointer',
+    zIndex: 1000,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(30,41,59,0.85)',
+    color: '#ffffff',
+    backdropFilter: 'blur(8px)',
   },
 };
