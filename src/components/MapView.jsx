@@ -196,6 +196,8 @@ export default function MapView({
 
     if (!destination) return;
 
+    const endLatLng = { lat: destination.coordinates[1], lng: destination.coordinates[0] };
+
     const endMarker = new window.google.maps.Marker({
       position: endLatLng,
       map: map,
