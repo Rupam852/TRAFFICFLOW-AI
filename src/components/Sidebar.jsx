@@ -834,6 +834,18 @@ export default function Sidebar({
                         {route.delayInfo && (
                           <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
                         )}
+                        {isSelected && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onStartNavigation(idx);
+                            }}
+                            className="glow-btn"
+                            style={styles.startNavBtn}
+                          >
+                            🚀 Start Live Navigation
+                          </button>
+                        )}
                       </div>
                     );
                   })}

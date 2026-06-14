@@ -882,13 +882,7 @@ export default function App() {
 
   }, [startLocation, destination, settings.mapboxKey, gmapsLoaded, user, travelMode]);
 
-  // Automatically start navigation once routes are calculated
-  useEffect(() => {
-    if (routeOptions && routeOptions.length > 0) {
-      setIsNavigating(true);
-      setIsSidebarOpen(false);
-    }
-  }, [routeOptions]);
+
 
 
   // Bookmarks Actions
