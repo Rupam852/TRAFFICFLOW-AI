@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, Shield, MessageSquareText, HelpCircle, Trash2 } from 'lucide-react';
 import AiPanel from './AiPanel';
+import { incrementApiUsage } from '../utils/usage';
 
 export default function Sidebar({
   settings,
@@ -70,6 +71,7 @@ export default function Sidebar({
         const res = await fetch(url);
         const data = await res.json();
         if (data.features && data.features.length > 0) {
+          incrementApiUsage('mapbox');
           const list = data.features.map(f => ({
             name: f.place_name,
             coordinates: f.geometry.coordinates
@@ -91,6 +93,7 @@ export default function Sidebar({
         const res = await fetch(url);
         const data = await res.json();
         if (data.results && data.results.length > 0) {
+          incrementApiUsage('tomtom');
           const list = data.results.map(r => ({
             name: r.address.freeformAddress,
             coordinates: [r.position.lon, r.position.lat]
@@ -196,6 +199,7 @@ export default function Sidebar({
           const res = await fetch(url);
           const data = await res.json();
           if (data.features && data.features.length > 0) {
+            incrementApiUsage('mapbox');
             return {
               name: data.features[0].place_name,
               coordinates: data.features[0].geometry.coordinates
@@ -213,6 +217,7 @@ export default function Sidebar({
           const res = await fetch(url);
           const data = await res.json();
           if (data.results && data.results.length > 0) {
+            incrementApiUsage('tomtom');
             return {
               name: data.results[0].address.freeformAddress,
               coordinates: [data.results[0].position.lon, data.results[0].position.lat]

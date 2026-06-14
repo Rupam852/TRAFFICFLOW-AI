@@ -4,6 +4,8 @@
  * Fallbacks to realistic simulated analysis if keys are not configured.
  */
 
+import { incrementApiUsage } from './usage';
+
 export async function generateAiRouteAnalysis({
   provider,
   apiKey,
@@ -36,6 +38,7 @@ Provide a concise, professional analysis (max 3 short paragraphs):
   }
 
   try {
+    incrementApiUsage('ai'); // Track real API usage
     if (provider === 'gemini') {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,

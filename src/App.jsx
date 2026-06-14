@@ -6,6 +6,7 @@ import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
 import { Menu } from 'lucide-react';
+import { incrementApiUsage } from './utils/usage';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -171,6 +172,9 @@ export default function App() {
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${settings.openWeatherKey}&units=metric`;
         const res = await fetch(url);
         if (!res.ok) throw new Error('Weather API request failed');
+        
+        incrementApiUsage('openWeather');
+        
         const data = await res.json();
         
         if (data.weather && data.weather[0]) {
@@ -237,6 +241,7 @@ export default function App() {
           );
           const data = await response.json();
           if (data.routes && data.routes.length > 0) {
+            incrementApiUsage('mapbox');
             const routesParsed = data.routes.map((r, index) => {
               const distanceKm = (r.distance / 1000).toFixed(1) + ' km';
               const durationMin = Math.round(r.duration / 60) + ' mins';
