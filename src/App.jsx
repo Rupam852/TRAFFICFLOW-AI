@@ -1229,6 +1229,7 @@ export default function App() {
         }}
         navMarkerPos={navMarkerPos}
         navMarkerBearing={navMarkerBearing}
+        isNavigating={isNavigating}
       />
 
       {/* Live Navigation HUD Overlay */}

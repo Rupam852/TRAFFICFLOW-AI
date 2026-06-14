@@ -1,8 +1,28 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset } from 'lucide-react';
 
+// Base styles to hide Tropic of Cancer/Equator latitude lines while keeping borders
+const googleMapsBaseStyles = [
+  {
+    featureType: "administrative",
+    elementType: "geometry",
+    stylers: [{ visibility: "off" }]
+  },
+  {
+    featureType: "administrative.country",
+    elementType: "geometry",
+    stylers: [{ visibility: "on" }]
+  },
+  {
+    featureType: "administrative.province",
+    elementType: "geometry",
+    stylers: [{ visibility: "on" }]
+  }
+];
+
 // Sleek Custom Dark Mode Styles for Google Maps
 const googleMapsDarkStyles = [
+  ...googleMapsBaseStyles,
   { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
   { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
   { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
@@ -65,6 +85,7 @@ export default function MapView({
   onMapClick,
   navMarkerPos,
   navMarkerBearing,
+  isNavigating,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -74,6 +95,10 @@ export default function MapView({
   const navMarkerRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [gmapsError, setGmapsError] = useState(false);
+
+  // Refs to track map boundary updates and avoid jumping zoom loops
+  const hasFittedBoundsRef = useRef(false);
+  const lastRouteKeyRef = useRef('');
 
   const timeOverlays = {
     day: 'rgba(0, 0, 0, 0)',
@@ -94,7 +119,7 @@ export default function MapView({
       if (!mapContainerRef.current) return;
 
       try {
-        const themeStyles = settings.theme === 'dark' ? googleMapsDarkStyles : [];
+        const themeStyles = settings.theme === 'dark' ? googleMapsDarkStyles : googleMapsBaseStyles;
 
         const map = new window.google.maps.Map(mapContainerRef.current, {
           center: { lat: 28.6139, lng: 77.2090 }, // New Delhi Default
@@ -137,6 +162,13 @@ export default function MapView({
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
     const map = mapRef.current;
+
+    // Reset fitted bounds flag if the destination/route/selected index has changed
+    const routeKey = `${destination?.coordinates?.join(',')}_${selectedRouteIndex}_${routeOptions?.length}`;
+    if (routeKey !== lastRouteKeyRef.current) {
+      hasFittedBoundsRef.current = false;
+      lastRouteKeyRef.current = routeKey;
+    }
 
     // Clear old markers
     markersRef.current.forEach(m => m.setMap(null));
@@ -193,7 +225,9 @@ export default function MapView({
         },
       });
       markersRef.current.push(startMarker);
-      map.panTo(startLatLng);
+      if (!isNavigating) {
+        map.panTo(startLatLng);
+      }
     }
 
     if (!destination) return;
@@ -217,11 +251,14 @@ export default function MapView({
     });
     markersRef.current.push(endMarker);
 
-    // Fit map bounds to show both markers
-    const bounds = new window.google.maps.LatLngBounds();
-    bounds.extend(startLatLng);
-    bounds.extend(endLatLng);
-    map.fitBounds(bounds);
+    // Fit map bounds to show both markers only once per route to avoid jumping zoom during active navigation
+    if (startLatLng && endLatLng && !hasFittedBoundsRef.current && !isNavigating) {
+      const bounds = new window.google.maps.LatLngBounds();
+      bounds.extend(startLatLng);
+      bounds.extend(endLatLng);
+      map.fitBounds(bounds);
+      hasFittedBoundsRef.current = true;
+    }
 
 
     // Draw only the selected route — alternatives are shown in the sidebar
@@ -295,7 +332,7 @@ export default function MapView({
 
 
 
-  }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois]);
+  }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois, isNavigating]);
 
   // Move navigator dot on the map when position updates
   useEffect(() => {
