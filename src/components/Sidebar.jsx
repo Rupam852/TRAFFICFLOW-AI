@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, Shield, MessageSquareText, HelpCircle } from 'lucide-react';
+import { Search, MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, Shield, MessageSquareText, HelpCircle, Trash2 } from 'lucide-react';
 import AiPanel from './AiPanel';
 
 export default function Sidebar({
@@ -15,6 +15,7 @@ export default function Sidebar({
   bookmarks,
   onAddBookmark,
   onSelectBookmark,
+  onRemoveBookmark,
   searchHistory,
   onSelectHistory,
   onAmenitiesSearch,
@@ -515,11 +516,23 @@ export default function Sidebar({
                       }}
                       style={styles.bookmarkItem}
                     >
-                      <Bookmark size={14} style={{ color: 'var(--primary)' }} />
-                      <div style={styles.bookmarkTextGroup}>
-                        <span style={styles.bookmarkName}>{bm.name}</span>
-                        <span style={styles.bookmarkAddress}>{bm.address}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, overflow: 'hidden' }}>
+                        <Bookmark size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                        <div style={styles.bookmarkTextGroup}>
+                          <span style={styles.bookmarkName}>{bm.name}</span>
+                          <span style={styles.bookmarkAddress}>{bm.address}</span>
+                        </div>
                       </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveBookmark(index);
+                        }}
+                        className="delete-bookmark-btn"
+                        title="Delete Bookmark"
+                      >
+                        <Trash2 size={14} />
+                      </button>
                     </div>
                   ))
                 )}

@@ -33,11 +33,15 @@ export default function App() {
   const [timeOfDay, setTimeOfDay] = useState('day');
 
   // Bookmarks & Search History States
-  const [bookmarks, setBookmarks] = useState([
-    { name: '📍 Office (Noida Sec 62)', coordinates: [77.3898, 28.6273], address: 'Noida Sector 62, Uttar Pradesh' },
-    { name: '🏠 Home (Connaught Place)', coordinates: [77.2187, 28.6299], address: 'Connaught Place, New Delhi' },
-    { name: '✈️ IGI Airport (T3)', coordinates: [77.1000, 28.5562], address: 'Indira Gandhi International Airport, Delhi' },
-  ]);
+  const [bookmarks, setBookmarks] = useState(() => {
+    const saved = localStorage.getItem('tf_bookmarks');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('tf_bookmarks', JSON.stringify(bookmarks));
+  }, [bookmarks]);
+
   const [searchHistory, setSearchHistory] = useState([
     { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
     { name: 'India Gate, Delhi', coordinates: [77.2295, 28.6129] },
@@ -272,6 +276,10 @@ export default function App() {
     setDestination({ name: bm.address, coordinates: bm.coordinates });
   };
 
+  const handleRemoveBookmark = (indexToRemove) => {
+    setBookmarks(prev => prev.filter((_, idx) => idx !== indexToRemove));
+  };
+
   // Search History Action
   const handleSelectHistory = (item) => {
     setDestination({ name: item.name, coordinates: item.coordinates });
@@ -375,6 +383,7 @@ export default function App() {
         bookmarks={bookmarks}
         onAddBookmark={handleAddBookmark}
         onSelectBookmark={handleSelectBookmark}
+        onRemoveBookmark={handleRemoveBookmark}
         searchHistory={searchHistory}
         onSelectHistory={handleSelectHistory}
         onAmenitiesSearch={handleAmenitiesSearch}

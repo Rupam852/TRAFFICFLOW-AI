@@ -361,4 +361,24 @@ h1, h2, h3, h4, h5, h6 {
   white-space: nowrap;
 }
 
+/* Delete Bookmark Button */
+.delete-bookmark-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.delete-bookmark-btn:hover {
+  color: #ef4444 !important;
+  background-color: rgba(239, 68, 68, 0.12);
+}
+
 
