@@ -9,6 +9,7 @@ import ShareEtaModal from './components/ShareEtaModal';
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [gmapsLoaded, setGmapsLoaded] = useState(false);
   
   // Settings State
   const [settings, setSettings] = useState({
@@ -72,6 +73,28 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('tf_weather', weather);
   }, [weather]);
+
+  // Dynamically load Google Maps script globally
+  useEffect(() => {
+    const oldScript = document.getElementById('google-maps-sdk');
+    if (oldScript) {
+      oldScript.remove();
+      if (window.google) {
+        delete window.google;
+      }
+      setGmapsLoaded(false);
+    }
+
+    const script = document.createElement('script');
+    script.id = 'google-maps-sdk';
+    // Load keyless by default for public usage, or use key if provided in settings
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.googleMapsKey || ''}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => setGmapsLoaded(true);
+    script.onerror = () => console.error('Google Maps API failed to load.');
+    document.head.appendChild(script);
+  }, [settings.googleMapsKey]);
 
   // Retrieve user's current location via HTML5 Geolocation API on login
   useEffect(() => {
@@ -341,6 +364,7 @@ export default function App() {
       {/* Navigation Layout Sidebars & Interactive Map View */}
       <Sidebar
         settings={settings}
+        gmapsLoaded={gmapsLoaded}
         startLocation={startLocation}
         setStartLocation={setStartLocation}
         destination={destination}
@@ -362,6 +386,7 @@ export default function App() {
 
       <MapView
         settings={settings}
+        gmapsLoaded={gmapsLoaded}
         startLocation={startLocation}
         destination={destination}
         routeOptions={routeOptions}

@@ -274,3 +274,43 @@ h1, h2, h3, h4, h5, h6 {
   background-color: var(--primary);
   color: white;
 }
+
+/* Google Autocomplete custom styling */
+.pac-container {
+  background-color: var(--bg-glass) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 8px !important;
+  box-shadow: var(--shadow-lg) !important;
+  font-family: var(--font-sans) !important;
+  z-index: 99999 !important; /* Stand above everything */
+  margin-top: 4px;
+}
+
+.pac-item {
+  border-top: 1px solid var(--border-color) !important;
+  padding: 8px 12px !important;
+  color: var(--text-primary) !important;
+  cursor: pointer !important;
+  transition: var(--transition-fast) !important;
+}
+
+.pac-item:hover {
+  background-color: var(--bg-tertiary) !important;
+}
+
+.pac-item-query {
+  color: var(--text-primary) !important;
+  font-size: 0.85rem !important;
+}
+
+.pac-matched {
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+}
+
+.pac-icon {
+  display: none !important; /* Hide generic search icon to keep it minimal */
+}
+

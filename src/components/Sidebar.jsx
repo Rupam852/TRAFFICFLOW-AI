@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, Shield, MessageSquareText, HelpCircle } from 'lucide-react';
 import AiPanel from './AiPanel';
 
 export default function Sidebar({
   settings,
+  gmapsLoaded,
   startLocation,
   setStartLocation,
   destination,
@@ -28,6 +29,10 @@ export default function Sidebar({
   const [newBookmarkName, setNewBookmarkName] = useState('');
   const [showAddBookmark, setShowAddBookmark] = useState(false);
 
+  const startInputRef = useRef(null);
+  const destInputRef = useRef(null);
+
+  // Sync inputs with props
   useEffect(() => {
     setStartInput(startLocation?.name || '');
   }, [startLocation]);
@@ -35,6 +40,60 @@ export default function Sidebar({
   useEffect(() => {
     setDestInput(destination?.name || '');
   }, [destination]);
+
+  // Bind Google Places Autocomplete to inputs when API script loads
+  useEffect(() => {
+    if (!gmapsLoaded || !window.google || !window.google.maps || !window.google.maps.places) return;
+
+    let startAutocomplete = null;
+    let destAutocomplete = null;
+
+    if (startInputRef.current) {
+      startAutocomplete = new window.google.maps.places.Autocomplete(startInputRef.current, {
+        fields: ['geometry', 'name', 'formatted_address']
+      });
+      startAutocomplete.addListener('place_changed', () => {
+        const place = startAutocomplete.getPlace();
+        if (place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const nameStr = place.name || place.formatted_address;
+          setStartInput(nameStr);
+          setStartLocation({
+            name: nameStr,
+            coordinates: [lng, lat]
+          });
+        }
+      });
+    }
+
+    if (destInputRef.current) {
+      destAutocomplete = new window.google.maps.places.Autocomplete(destInputRef.current, {
+        fields: ['geometry', 'name', 'formatted_address']
+      });
+      destAutocomplete.addListener('place_changed', () => {
+        const place = destAutocomplete.getPlace();
+        if (place.geometry && place.geometry.location) {
+          const lat = place.geometry.location.lat();
+          const lng = place.geometry.location.lng();
+          const nameStr = place.name || place.formatted_address;
+          setDestInput(nameStr);
+          setDestination({
+            name: nameStr,
+            coordinates: [lng, lat]
+          });
+        }
+      });
+    }
+
+    // Cleanup listeners
+    return () => {
+      if (window.google && window.google.maps && window.google.maps.event) {
+        if (startAutocomplete) window.google.maps.event.clearInstanceListeners(startAutocomplete);
+        if (destAutocomplete) window.google.maps.event.clearInstanceListeners(destAutocomplete);
+      }
+    };
+  }, [gmapsLoaded]);
 
 
   const handleSearchSubmit = (e) => {
@@ -132,6 +191,7 @@ export default function Sidebar({
                 <div style={styles.searchFieldGroup}>
                   <MapPin size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
                   <input
+                    ref={startInputRef}
                     type="text"
                     placeholder="Enter starting location..."
                     value={startInput}
@@ -143,6 +203,7 @@ export default function Sidebar({
                 <div style={styles.searchFieldGroup}>
                   <Navigation size={16} style={{ color: 'var(--accent)', flexShrink: 0, transform: 'rotate(45deg)' }} />
                   <input
+                    ref={destInputRef}
                     type="text"
                     placeholder="Where to?"
                     value={destInput}
