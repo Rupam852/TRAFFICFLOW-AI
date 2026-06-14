@@ -586,7 +586,7 @@ export default function MapView({
       </div>
 
       {/* Floating Recenter Map Button */}
-      {!autoFollow && navMarkerPos && (
+      {navMarkerPos && (
         <button
           onClick={() => {
             setAutoFollow(true);
