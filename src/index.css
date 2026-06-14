@@ -519,3 +519,27 @@ h1, h2, h3, h4, h5, h6 {
     display: none !important;
   }
 }
+
+/* Glassy, glowing sign out button */
+.logout-btn {
+  background: rgba(239, 68, 68, 0.05);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  color: rgba(239, 68, 68, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.1);
+}
+
+.logout-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.45);
+  color: #ef4444;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.4);
+  transform: scale(1.05);
+}

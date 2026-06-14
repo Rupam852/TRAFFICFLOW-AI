@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, MessageSquareText, Trash2 } from 'lucide-react';
+import { MapPin, Navigation, History, Bookmark, BookmarkPlus, Map, Coffee, Fuel, MessageSquareText, Trash2, LogOut } from 'lucide-react';
 import AiPanel from './AiPanel';
 import { incrementApiUsage } from '../utils/usage';
 
@@ -481,7 +481,8 @@ export default function Sidebar({
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           color: user?.user_metadata?.avatar_url ? 'transparent' : undefined,
-          border: user?.user_metadata?.avatar_url ? '2px solid var(--primary)' : undefined,
+          border: user?.user_metadata?.avatar_url ? '2px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
+          boxShadow: '0 0 8px var(--primary-glow)',
         }}>
           {!user?.user_metadata?.avatar_url && (user?.email ? user.email[0].toUpperCase() : 'U')}
         </div>
@@ -493,8 +494,8 @@ export default function Sidebar({
             {user?.user_metadata?.full_name || user?.user_metadata?.name ? user.email : 'Premium Account'}
           </span>
         </div>
-        <button onClick={onLogout} style={styles.logoutBtn} title="Sign Out">
-          🚪
+        <button onClick={onLogout} className="logout-btn" title="Sign Out">
+          <LogOut size={16} />
         </button>
       </div>
 
@@ -929,6 +930,8 @@ const styles = {
     justifyContent: 'center',
     fontWeight: '700',
     fontSize: '0.95rem',
+    boxShadow: '0 0 8px var(--primary-glow)',
+    border: '1px solid rgba(255, 255, 255, 0.1)',
   },
   userInfo: {
     display: 'flex',
@@ -948,15 +951,7 @@ const styles = {
     fontSize: '0.7rem',
     color: 'var(--text-muted)',
   },
-  logoutBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    padding: '4px',
-    borderRadius: '4px',
-    transition: 'var(--transition-smooth)',
-  },
+
   tabContainer: {
     display: 'flex',
     borderBottom: '1px solid var(--border-color)',
