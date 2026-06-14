@@ -227,10 +227,8 @@ export default function App() {
     document.head.appendChild(script);
   }, [settings.googleMapsKey]);
 
-  // Retrieve user's current location via HTML5 Geolocation API on login
+  // Retrieve user's current location via HTML5 Geolocation API on mount
   useEffect(() => {
-    if (!user) return;
-    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
@@ -254,7 +252,7 @@ export default function App() {
         coordinates: [77.2090, 28.6139]
       });
     }
-  }, [user]);
+  }, []);
 
   const handleAuthSuccess = (authUser) => {
     setUser(authUser);
@@ -483,7 +481,25 @@ export default function App() {
     }
 
     const fetchRoutes = async () => {
-      const start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
+      let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
+
+      // If start is "My Current Location", fetch fresh GPS coordinates first
+      if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
+        try {
+          const freshPos = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
+          });
+          start = [freshPos.coords.longitude, freshPos.coords.latitude];
+          // Update startLocation state with the fresh coordinates so start marker snaps to user
+          setStartLocation(prev => ({
+            ...prev,
+            coordinates: start
+          }));
+        } catch (err) {
+          console.warn('Could not fetch fresh GPS coordinates for routing:', err);
+        }
+      }
+
       const end = destination.coordinates;
 
       /**
