@@ -60,7 +60,8 @@ export default function MapView({
   timeOfDay,
   setTimeOfDay,
   pois,
-  onPoiClick
+  onPoiClick,
+  onMapClick
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -97,6 +98,11 @@ export default function MapView({
         // Enable real-time traffic highlights via Google's Traffic Layer
         const trafficLayer = new window.google.maps.TrafficLayer();
         trafficLayer.setMap(map);
+
+        // Collapse sidebar on map click
+        map.addListener('click', () => {
+          if (onMapClick) onMapClick();
+        });
 
         mapRef.current = map;
         setMapLoaded(true);

@@ -381,4 +381,34 @@ h1, h2, h3, h4, h5, h6 {
   background-color: rgba(239, 68, 68, 0.12);
 }
 
+/* Floating Menu Button */
+.floating-menu-btn {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1000;
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  background-color: var(--bg-glass);
+  backdrop-filter: blur(var(--glass-blur));
+  -webkit-backdrop-filter: blur(var(--glass-blur));
+  box-shadow: var(--shadow-md);
+  transition: var(--transition-smooth);
+  animation: fadeIn 0.3s ease;
+}
+
+.floating-menu-btn:hover {
+  transform: scale(1.08);
+  background-color: var(--bg-glass-hover);
+  border-color: var(--primary);
+  box-shadow: 0 0 12px var(--primary-glow);
+}
+
 

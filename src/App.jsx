@@ -5,11 +5,13 @@ import MapView from './components/MapView';
 import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
+import { Menu } from 'lucide-react';
 
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   
   // Settings State
   const [settings, setSettings] = useState({
@@ -336,6 +338,7 @@ export default function App() {
 
   const handleSelectBookmark = (bm) => {
     setDestination({ name: bm.address, coordinates: bm.coordinates });
+    setIsSidebarOpen(false);
   };
 
   const handleRemoveBookmark = (indexToRemove) => {
@@ -345,6 +348,7 @@ export default function App() {
   // Search History Action
   const handleSelectHistory = (item) => {
     setDestination({ name: item.name, coordinates: item.coordinates });
+    setIsSidebarOpen(false);
   };
 
   // Amenities Search Action (spawns POIs on map viewport)
@@ -432,9 +436,22 @@ export default function App() {
       )}
 
       {/* Navigation Layout Sidebars & Interactive Map View */}
+      {/* Floating Hamburger Button for collapsed Sidebar */}
+      {!isSidebarOpen && (
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="floating-menu-btn"
+          title="Open Navigation Sidebar"
+        >
+          <Menu size={20} />
+        </button>
+      )}
+
       <Sidebar
         settings={settings}
         gmapsLoaded={gmapsLoaded}
+        isSidebarOpen={isSidebarOpen}
+        onCollapse={() => setIsSidebarOpen(false)}
         startLocation={startLocation}
         setStartLocation={setStartLocation}
         destination={destination}
@@ -469,6 +486,7 @@ export default function App() {
         setTimeOfDay={setTimeOfDay}
         pois={pois}
         onPoiClick={handlePoiClick}
+        onMapClick={() => setIsSidebarOpen(false)}
       />
 
     </div>

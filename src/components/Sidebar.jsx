@@ -5,6 +5,8 @@ import AiPanel from './AiPanel';
 export default function Sidebar({
   settings,
   gmapsLoaded,
+  isSidebarOpen,
+  onCollapse,
   startLocation,
   setStartLocation,
   destination,
@@ -266,6 +268,8 @@ export default function Sidebar({
       // If destination is already set from selection, update it to trigger route updates in App.jsx
       setDestination({ ...destination });
     }
+
+    if (onCollapse) onCollapse();
   };
 
   const handleQuickAmenity = (type) => {
@@ -308,7 +312,14 @@ export default function Sidebar({
   };
 
   return (
-    <div className="glass-panel" style={styles.sidebar}>
+    <div 
+      className="glass-panel" 
+      style={{ 
+        ...styles.sidebar, 
+        marginLeft: isSidebarOpen ? '0px' : '-400px',
+        transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}
+    >
       {/* Brand Header */}
       <div style={styles.header}>
         <div style={styles.logoGroup}>
