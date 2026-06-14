@@ -29,6 +29,9 @@ export default function Sidebar({
   const [destInput, setDestInput] = useState(destination?.name || '');
   const [newBookmarkName, setNewBookmarkName] = useState('');
   const [showAddBookmark, setShowAddBookmark] = useState(false);
+  const [newBookmarkAddress, setNewBookmarkAddress] = useState('');
+  const [newBookmarkCoords, setNewBookmarkCoords] = useState(null);
+  const [bookmarkSuggestions, setBookmarkSuggestions] = useState([]);
 
   const [startSuggestions, setStartSuggestions] = useState([]);
   const [destSuggestions, setDestSuggestions] = useState([]);
@@ -51,6 +54,7 @@ export default function Sidebar({
     if (!query || query.trim().length < 2) {
       if (field === 'start') setStartSuggestions([]);
       if (field === 'dest') setDestSuggestions([]);
+      if (field === 'bookmark') setBookmarkSuggestions([]);
       return;
     }
 
@@ -70,6 +74,7 @@ export default function Sidebar({
           }));
           if (field === 'start') setStartSuggestions(list);
           if (field === 'dest') setDestSuggestions(list);
+          if (field === 'bookmark') setBookmarkSuggestions(list);
           return;
         }
       } catch (e) {
@@ -90,6 +95,7 @@ export default function Sidebar({
           }));
           if (field === 'start') setStartSuggestions(list);
           if (field === 'dest') setDestSuggestions(list);
+          if (field === 'bookmark') setBookmarkSuggestions(list);
           return;
         }
       } catch (e) {
@@ -117,6 +123,7 @@ export default function Sidebar({
         });
         if (field === 'start') setStartSuggestions(list);
         if (field === 'dest') setDestSuggestions(list);
+        if (field === 'bookmark') setBookmarkSuggestions(list);
       }
     } catch (e) {
       console.error('All Autocomplete options failed:', e);
@@ -139,6 +146,14 @@ export default function Sidebar({
     }, 300);
     return () => clearTimeout(timer);
   }, [destInput, focusedField]);
+
+  useEffect(() => {
+    if (focusedField !== 'bookmark') return;
+    const timer = setTimeout(() => {
+      queryAutocomplete(newBookmarkAddress, 'bookmark');
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [newBookmarkAddress, focusedField]);
 
   const handleSelectSuggestion = (suggestion, field) => {
     if (field === 'start') {
@@ -257,15 +272,38 @@ export default function Sidebar({
     onAmenitiesSearch(type);
   };
 
+  const handleSelectBookmarkSuggestion = (suggestion) => {
+    setNewBookmarkAddress(suggestion.name);
+    setNewBookmarkCoords(suggestion.coordinates);
+    setBookmarkSuggestions([]);
+  };
+
   const handleAddBookmarkSubmit = (e) => {
     e.preventDefault();
-    if (!newBookmarkName || !destination) return;
+    if (!newBookmarkName) return;
+
+    let finalAddr = newBookmarkAddress;
+    let finalCoords = newBookmarkCoords;
+
+    if (!finalCoords && destination) {
+      finalAddr = destination.name;
+      finalCoords = destination.coordinates;
+    }
+
+    if (!finalCoords) {
+      alert("Please select a location from the suggestions list.");
+      return;
+    }
+
     onAddBookmark({
       name: newBookmarkName,
-      coordinates: destination.coordinates,
-      address: destination.name
+      coordinates: finalCoords,
+      address: finalAddr
     });
+
     setNewBookmarkName('');
+    setNewBookmarkAddress('');
+    setNewBookmarkCoords(null);
     setShowAddBookmark(false);
   };
 
@@ -405,6 +443,136 @@ export default function Sidebar({
               </button>
             </form>
 
+            {/* Quick Bookmarks */}
+            <div style={styles.section}>
+              <div style={styles.sectionHeader}>
+                <span style={styles.sectionTitle}>Bookmarks</span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddBookmark(!showAddBookmark)}
+                  style={styles.addBookmarkBtn}
+                >
+                  <BookmarkPlus size={14} />
+                  <span>Add Bookmark</span>
+                </button>
+              </div>
+
+              {showAddBookmark && (
+                <form onSubmit={handleAddBookmarkSubmit} style={styles.addBookmarkForm}>
+                  <input
+                    type="text"
+                    placeholder="Label (e.g. Home, Work)"
+                    value={newBookmarkName}
+                    onChange={(e) => setNewBookmarkName(e.target.value)}
+                    style={styles.addBookmarkInput}
+                    required
+                  />
+                  <div style={{ position: 'relative', zIndex: 100 }}>
+                    <input
+                      type="text"
+                      placeholder="Search address/location..."
+                      value={newBookmarkAddress}
+                      onChange={(e) => {
+                        setNewBookmarkAddress(e.target.value);
+                        setFocusedField('bookmark');
+                      }}
+                      onFocus={() => setFocusedField('bookmark')}
+                      onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                      style={styles.addBookmarkInput}
+                    />
+                    {focusedField === 'bookmark' && bookmarkSuggestions.length > 0 && (
+                      <div className="suggestions-dropdown" style={{ top: '100%', left: 0, right: 0 }}>
+                        {bookmarkSuggestions.map((s, idx) => (
+                          <div
+                            key={idx}
+                            onMouseDown={() => handleSelectBookmarkSuggestion(s)}
+                            className="suggestion-item"
+                          >
+                            <MapPin size={12} className="suggestion-icon" style={{ color: 'var(--primary)' }} />
+                            <span className="suggestion-text">{s.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {destination && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewBookmarkAddress(destination.name);
+                        setNewBookmarkCoords(destination.coordinates);
+                      }}
+                      style={styles.quickUseDestBtn}
+                    >
+                      📍 Use Active Destination ({destination.name.slice(0, 25)}...)
+                    </button>
+                  )}
+
+                  <button type="submit" style={styles.addBookmarkSubmit}>Save Bookmark</button>
+                </form>
+              )}
+
+              <div style={styles.bookmarksList}>
+                {bookmarks.length === 0 ? (
+                  <span style={styles.emptyText}>No bookmarks saved yet.</span>
+                ) : (
+                  bookmarks.map((bm, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        setDestInput(bm.address);
+                        onSelectBookmark(bm);
+                      }}
+                      style={styles.bookmarkItem}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, overflow: 'hidden' }}>
+                        <Bookmark size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                        <div style={styles.bookmarkTextGroup}>
+                          <span style={styles.bookmarkName}>{bm.name}</span>
+                          <span style={styles.bookmarkAddress}>{bm.address}</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onRemoveBookmark(index);
+                        }}
+                        className="delete-bookmark-btn"
+                        title="Delete Bookmark"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Search History */}
+            <div style={styles.section}>
+              <span style={styles.sectionTitle}>Recent Searches</span>
+              <div style={styles.historyList}>
+                {searchHistory.length === 0 ? (
+                  <span style={styles.emptyText}>No recent searches.</span>
+                ) : (
+                  searchHistory.map((item, index) => (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        setDestInput(item.name);
+                        onSelectHistory(item);
+                      }}
+                      style={styles.historyItem}
+                    >
+                      <History size={14} style={{ color: 'var(--text-muted)' }} />
+                      <span style={styles.historyName}>{item.name}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
             {/* Quick Amenities Shortcuts */}
             <div style={styles.section}>
               <span style={styles.sectionTitle}>Amenities Shortcuts</span>
@@ -476,92 +644,6 @@ export default function Sidebar({
                 </div>
               </div>
             )}
-
-            {/* Quick Bookmarks */}
-            <div style={styles.section}>
-              <div style={styles.sectionHeader}>
-                <span style={styles.sectionTitle}>Bookmarks</span>
-                {destination && (
-                  <button onClick={() => setShowAddBookmark(!showAddBookmark)} style={styles.addBookmarkBtn}>
-                    <BookmarkPlus size={14} />
-                    <span>Save Dest</span>
-                  </button>
-                )}
-              </div>
-
-              {showAddBookmark && (
-                <form onSubmit={handleAddBookmarkSubmit} style={styles.addBookmarkForm}>
-                  <input
-                    type="text"
-                    placeholder="e.g. Work, Home, Gym"
-                    value={newBookmarkName}
-                    onChange={(e) => setNewBookmarkName(e.target.value)}
-                    style={styles.addBookmarkInput}
-                    required
-                  />
-                  <button type="submit" style={styles.addBookmarkSubmit}>Save</button>
-                </form>
-              )}
-
-              <div style={styles.bookmarksList}>
-                {bookmarks.length === 0 ? (
-                  <span style={styles.emptyText}>No bookmarks saved yet.</span>
-                ) : (
-                  bookmarks.map((bm, index) => (
-                    <div
-                      key={index}
-                      onClick={() => {
-                        setDestInput(bm.address);
-                        onSelectBookmark(bm);
-                      }}
-                      style={styles.bookmarkItem}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, overflow: 'hidden' }}>
-                        <Bookmark size={14} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                        <div style={styles.bookmarkTextGroup}>
-                          <span style={styles.bookmarkName}>{bm.name}</span>
-                          <span style={styles.bookmarkAddress}>{bm.address}</span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveBookmark(index);
-                        }}
-                        className="delete-bookmark-btn"
-                        title="Delete Bookmark"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Search History */}
-            <div style={styles.section}>
-              <span style={styles.sectionTitle}>Recent Searches</span>
-              <div style={styles.historyList}>
-                {searchHistory.length === 0 ? (
-                  <span style={styles.emptyText}>No recent searches.</span>
-                ) : (
-                  searchHistory.map((item, index) => (
-                    <div
-                      key={index}
-                      onClick={() => {
-                        setDestInput(item.name);
-                        onSelectHistory(item);
-                      }}
-                      style={styles.historyItem}
-                    >
-                      <History size={14} style={{ color: 'var(--text-muted)' }} />
-                      <span style={styles.historyName}>{item.name}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
 
           </div>
         ) : (
@@ -868,8 +950,30 @@ const styles = {
   },
   addBookmarkForm: {
     display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    marginBottom: '12px',
+    padding: '12px',
+    borderRadius: '8px',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    border: '1px solid var(--border-color)',
+  },
+  quickUseDestBtn: {
+    padding: '8px 10px',
+    borderRadius: '6px',
+    border: '1px dashed var(--primary)',
+    background: 'none',
+    color: 'var(--primary)',
+    fontSize: '0.75rem',
+    cursor: 'pointer',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: '6px',
-    marginBottom: '8px',
+    transition: 'var(--transition-fast)',
+    width: '100%',
+    textAlign: 'center',
   },
   addBookmarkInput: {
     flex: 1,
