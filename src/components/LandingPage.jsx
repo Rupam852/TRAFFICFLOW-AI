@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Navigation, ArrowRight, ShieldCheck, Cpu, CloudRain, Map, ChevronDown, ChevronUp, Zap, GitMerge, BarChart3, Clock } from 'lucide-react';
+import { Navigation, ArrowRight, ShieldCheck, Cpu, CloudRain, Map, ChevronDown, ChevronUp, Zap, GitMerge, BarChart3, Clock, X } from 'lucide-react';
 
 export default function LandingPage({ onNavigate }) {
   const [activeFaq, setActiveFaq] = useState(null);
   const [animateGrid, setAnimateGrid] = useState(false);
+  const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
 
   useEffect(() => {
     setAnimateGrid(true);
@@ -262,12 +263,66 @@ export default function LandingPage({ onNavigate }) {
               <span onClick={() => onNavigate('login')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Sign In</span>
               <span onClick={() => onNavigate('signup')} style={{ ...styles.footerLink, cursor: 'pointer' }}>Sign Up</span>
             </div>
+            <div style={styles.footerLinkCol}>
+              <h4 style={styles.footerColTitle}>Legal</h4>
+              <span onClick={() => setIsPrivacyOpen(true)} style={{ ...styles.footerLink, cursor: 'pointer' }}>Privacy Policy</span>
+            </div>
           </div>
         </div>
         <div style={styles.footerBottom}>
           <span>&copy; {new Date().getFullYear()} TrafficFlow AI. All rights reserved.</span>
         </div>
       </footer>
+
+      {/* Privacy Policy Modal */}
+      {isPrivacyOpen && (
+        <div className="privacy-modal-backdrop" onClick={() => setIsPrivacyOpen(false)}>
+          <div className="privacy-modal-card" onClick={(e) => e.stopPropagation()}>
+            <button 
+              onClick={() => setIsPrivacyOpen(false)} 
+              className="privacy-modal-close"
+              title="Close Privacy Policy"
+            >
+              <X size={18} />
+            </button>
+            <div className="privacy-modal-scroll">
+              <h2 className="privacy-modal-title">Privacy Policy</h2>
+              <p className="privacy-modal-date">Last Updated: June 17, 2026</p>
+              
+              <div className="privacy-modal-section">
+                <h3 className="privacy-modal-sectitle">1. Information We Collect</h3>
+                <p className="privacy-modal-text">
+                  TrafficFlow AI collects minimal personal information. If you create an account, we store your email address and account credentials securely. Your API keys (Google Maps, Mapbox, OpenWeather) are stored strictly on your local browser cache (localStorage) or inside your private, encrypted database row in Supabase.
+                </p>
+              </div>
+
+              <div className="privacy-modal-section">
+                <h3 className="privacy-modal-sectitle">2. How We Use Information</h3>
+                <p className="privacy-modal-text">
+                  Your data is used solely to provide navigation, route optimizations, and telemetry simulation features. We do not sell, share, or rent your personal information or API usage data to third parties.
+                </p>
+              </div>
+
+              <div className="privacy-modal-section">
+                <h3 className="privacy-modal-sectitle">3. Third-Party Integrations</h3>
+                <p className="privacy-modal-text">
+                  Routing and maps are powered by third-party APIs (Google Maps, Mapbox, TomTom, OpenStreetMap, and OpenWeatherMap). Your usage is governed by their respective privacy policies.
+                </p>
+              </div>
+
+              <div className="privacy-modal-section">
+                <h3 className="privacy-modal-sectitle">4. Contact Us</h3>
+                <p className="privacy-modal-text">
+                  If you have any questions, concerns, or requests regarding this Privacy Policy, please reach out to our support team at:
+                </p>
+                <div className="privacy-modal-email-row">
+                  📧 <a href="mailto:rupambairagya08@gmail.com" className="privacy-modal-email-link">rupambairagya08@gmail.com</a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
