@@ -466,6 +466,16 @@ export default function MapView({
     }
   }, [isRouteSimulationActive, navMarkerPos, navMarkerBearing]);
 
+  // Synchronize Google Map styles dynamically with timeOfDay (day/night cycle) and settings.theme
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
+
+    const isNightMode = timeOfDay === 'night' || settings.theme === 'dark';
+    const themeStyles = isNightMode ? googleMapsDarkStyles : googleMapsBaseStyles;
+
+    mapRef.current.setOptions({ styles: themeStyles });
+  }, [timeOfDay, settings.theme, mapLoaded]);
+
   // Handle active amenity searches around map center
   useEffect(() => {
     if (!activeAmenitySearch || !mapRef.current || !window.google || !window.google.maps) {
@@ -569,6 +579,27 @@ export default function MapView({
     }
 
     const render = () => {
+      const offsetWidth = canvas.offsetWidth;
+      const offsetHeight = canvas.offsetHeight;
+      if (canvas.width !== offsetWidth || canvas.height !== offsetHeight) {
+        canvas.width = offsetWidth;
+        canvas.height = offsetHeight;
+        const oldWidth = width;
+        width = offsetWidth;
+        height = offsetHeight;
+
+        if (oldWidth === 0 && width > 0) {
+          rainParticles.forEach(p => {
+            p.x = Math.random() * width;
+            p.y = Math.random() * height;
+          });
+          fogParticles.forEach(p => {
+            p.x = Math.random() * width;
+            p.y = Math.random() * height;
+          });
+        }
+      }
+
       ctx.clearRect(0, 0, width, height);
 
       // Rain rendering
