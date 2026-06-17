@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset, X, CloudSun } from 'lucide-react';
+import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset, X, CloudSun, RotateCw, Box } from 'lucide-react';
 
 // Base styles to hide Tropic of Cancer/Equator latitude lines while keeping borders
 const googleMapsBaseStyles = [
@@ -387,7 +387,21 @@ export default function MapView({
         pathCoords.forEach(pt => bounds.extend(pt));
         if (startLatLng) bounds.extend(startLatLng);
         if (endLatLng) bounds.extend(endLatLng);
+        
+        // Capture current perspective before fitBounds flattens it
+        const currentTilt = map.getTilt() || 45;
+        const currentHeading = map.getHeading() || 0;
+        
         map.fitBounds(bounds, { top: 80, right: 40, bottom: 80, left: 40 });
+        
+        // Restore perspective once bounds-fitting completes and map goes idle
+        const once = map.addListener('idle', () => {
+          map.setTilt(currentTilt);
+          if (currentHeading) {
+            map.setHeading(currentHeading);
+          }
+          once.remove();
+        });
       }
     }
 
@@ -803,23 +817,52 @@ export default function MapView({
         </button>
       )}
 
-      {/* Floating Recenter Map Button */}
-      {navMarkerPos && (
+      {/* Map Perspective & Navigation Controls Stack */}
+      <div className="map-controls-stack" style={styles.controlsStack}>
+        {navMarkerPos && (
+          <button
+            onClick={() => {
+              setAutoFollow(true);
+              if (mapRef.current && navMarkerPos) {
+                const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
+                mapRef.current.panTo(latlng);
+                mapRef.current.setZoom(16);
+              }
+            }}
+            className="glass-panel map-control-btn recenter-btn-responsive"
+            title="Recenter Map"
+          >
+            🎯 <span className="control-btn-text">Recenter</span>
+          </button>
+        )}
+
         <button
           onClick={() => {
-            setAutoFollow(true);
-            if (mapRef.current && navMarkerPos) {
-              const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
-              mapRef.current.panTo(latlng);
-              mapRef.current.setZoom(16);
+            if (mapRef.current) {
+              const currentHeading = mapRef.current.getHeading() || 0;
+              mapRef.current.setHeading((currentHeading + 45) % 360);
             }
           }}
-          className="glass-panel glow-btn recenter-btn-responsive"
-          style={styles.recenterBtn}
+          className="glass-panel map-control-btn"
+          title="Rotate Map 45°"
         >
-          🎯 Recenter Map
+          <RotateCw size={14} /> <span className="control-btn-text">Rotate</span>
         </button>
-      )}
+
+        <button
+          onClick={() => {
+            if (mapRef.current) {
+              const currentTilt = mapRef.current.getTilt() || 0;
+              // Toggle between 2D (0 tilt) and 3D (45 tilt)
+              mapRef.current.setTilt(currentTilt === 0 ? 45 : 0);
+            }
+          }}
+          className="glass-panel map-control-btn"
+          title="Toggle 2D/3D Perspective"
+        >
+          <Box size={14} /> <span className="control-btn-text">3D view</span>
+        </button>
+      </div>
 
       {/* Floating Routing Engine Status Indicator */}
       {destination && (
@@ -926,24 +969,14 @@ const styles = {
     gap: '4px',
     transition: 'var(--transition-smooth)',
   },
-  recenterBtn: {
+  controlsStack: {
     position: 'absolute',
     top: '20px',
     right: '20px',
-    padding: '10px 16px',
-    borderRadius: '10px',
-    fontSize: '0.8rem',
-    fontWeight: '700',
-    cursor: 'pointer',
-    zIndex: 1000,
     display: 'flex',
-    alignItems: 'center',
-    gap: '6px',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-    border: '1px solid rgba(255,255,255,0.1)',
-    background: 'rgba(30,41,59,0.85)',
-    color: '#ffffff',
-    backdropFilter: 'blur(8px)',
+    flexDirection: 'column',
+    gap: '8px',
+    zIndex: 1000,
   },
   routingStatusBanner: {
     position: 'absolute',

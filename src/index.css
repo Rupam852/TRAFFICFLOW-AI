@@ -894,9 +894,42 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Responsive map control overlays */
-.recenter-btn-responsive {
-  /* Default positioning is style-based (top-right) */
+.map-controls-stack {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1000;
   transition: var(--transition-smooth);
+}
+
+.map-control-btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  background: rgba(30,41,59,0.85) !important;
+  color: #ffffff !important;
+  backdrop-filter: blur(8px);
+  transition: var(--transition-smooth);
+}
+
+.map-control-btn:hover {
+  background: var(--primary) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px var(--primary-glow);
+}
+
+.map-control-btn:active {
+  transform: translateY(1px);
 }
 
 .routing-status-responsive {
@@ -915,16 +948,23 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Mobile overrides for map controls and HUD elements */
 @media (max-width: 640px) {
-  .recenter-btn-responsive {
-    position: absolute !important;
+  .map-controls-stack {
     top: 16px !important;
     right: 16px !important;
-    bottom: auto !important;
-    left: auto !important;
-    padding: 8px 14px !important;
-    font-size: 0.75rem !important;
+    gap: 6px !important;
+  }
+
+  .map-control-btn {
+    padding: 8px !important;
+    width: 38px !important;
+    height: 38px !important;
     border-radius: 8px !important;
-    z-index: 1000 !important;
+    justify-content: center !important;
+    font-size: 0.75rem !important;
+  }
+
+  .control-btn-text {
+    display: none !important;
   }
 
   .routing-status-responsive {
