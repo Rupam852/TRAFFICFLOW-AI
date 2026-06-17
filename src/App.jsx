@@ -752,7 +752,7 @@ export default function App() {
         } catch (error) {
           console.warn('Google Maps Directions Service failed, trying Mapbox API:', error);
           if (error.message && error.message.includes('REQUEST_DENIED')) {
-            googleMapsErrorMsg = 'Directions API is not enabled in your Google Cloud Console for this API key.';
+            googleMapsErrorMsg = 'Directions API request denied. If you recently enabled it, Google can take up to 5-10 minutes to propagate the changes. Also, ensure your API Key has no "API restrictions" blocking Directions API (under Credentials > API Key settings in Google Console) and that billing is active for your Google Cloud project.';
           } else {
             googleMapsErrorMsg = error.message || 'Unknown error';
           }

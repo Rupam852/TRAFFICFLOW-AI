@@ -550,9 +550,9 @@ export default function Sidebar({
                   <div style={{ marginTop: '4px', fontSize: '0.74rem', opacity: 0.9 }}>
                     {routingError}
                   </div>
-                  {routingError.includes('Console') && (
-                    <div style={{ marginTop: '6px', fontSize: '0.72rem', fontWeight: '700', textDecoration: 'underline' }}>
-                      To fix: Enable the "Directions API" in Google Cloud Console.
+                  {(routingError.includes('Console') || routingError.includes('denied')) && (
+                    <div style={{ marginTop: '8px', fontSize: '0.72rem', fontWeight: '700', textDecoration: 'underline' }}>
+                      To fix: Wait 5 minutes for activation, check API key restrictions/billing in Google Console, and refresh the page.
                     </div>
                   )}
                 </div>
