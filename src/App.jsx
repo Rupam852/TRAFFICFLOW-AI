@@ -252,7 +252,7 @@ export default function App() {
         if (settingsError && settingsError.code !== 'PGRST116') {
           console.error('Error fetching settings:', settingsError);
         } else if (settingsData) {
-          setSettings({
+          const loadedSettings = {
             theme: settingsData.theme || 'dark',
             googleMapsKey: (settingsData.google_maps_key || '').trim(),
             mapboxKey: (settingsData.mapbox_key || '').trim(),
@@ -260,20 +260,46 @@ export default function App() {
             openWeatherKey: (settingsData.open_weather_key || '').trim(),
             aiProvider: settingsData.ai_provider || 'gemini',
             aiKey: (settingsData.ai_key || '').trim(),
-          });
+          };
+          setSettings(loadedSettings);
+          localStorage.setItem('tf_theme', loadedSettings.theme);
+          localStorage.setItem('tf_google_maps_key', loadedSettings.googleMapsKey);
+          localStorage.setItem('tf_mapbox_key', loadedSettings.mapboxKey);
+          localStorage.setItem('tf_tomtom_key', loadedSettings.tomtomKey);
+          localStorage.setItem('tf_open_weather_key', loadedSettings.openWeatherKey);
+          localStorage.setItem('tf_ai_provider', loadedSettings.aiProvider);
+          localStorage.setItem('tf_ai_key', loadedSettings.aiKey);
         } else {
           // No settings found, create new default settings row in Supabase
+          // We initialize with empty keys for the new user session
           const defaultSettings = {
             user_id: user.id,
             theme: localStorage.getItem('tf_theme') || 'dark',
-            google_maps_key: (localStorage.getItem('tf_google_maps_key') || '').trim(),
-            mapbox_key: (localStorage.getItem('tf_mapbox_key') || '').trim(),
-            tomtom_key: (localStorage.getItem('tf_tomtom_key') || '').trim(),
-            open_weather_key: (localStorage.getItem('tf_open_weather_key') || '').trim(),
-            ai_provider: localStorage.getItem('tf_ai_provider') || 'gemini',
-            ai_key: (localStorage.getItem('tf_ai_key') || '').trim(),
+            google_maps_key: '',
+            mapbox_key: '',
+            tomtom_key: '',
+            open_weather_key: '',
+            ai_provider: 'gemini',
+            ai_key: '',
           };
           await supabase.from('user_settings').insert([defaultSettings]);
+          
+          setSettings({
+            theme: defaultSettings.theme,
+            googleMapsKey: '',
+            mapboxKey: '',
+            tomtomKey: '',
+            openWeatherKey: '',
+            aiProvider: 'gemini',
+            aiKey: '',
+          });
+
+          localStorage.removeItem('tf_google_maps_key');
+          localStorage.removeItem('tf_mapbox_key');
+          localStorage.removeItem('tf_tomtom_key');
+          localStorage.removeItem('tf_open_weather_key');
+          localStorage.setItem('tf_ai_provider', 'gemini');
+          localStorage.removeItem('tf_ai_key');
         }
 
         // 2. Fetch search history
@@ -438,6 +464,12 @@ export default function App() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem('tf_google_maps_key');
+    localStorage.removeItem('tf_mapbox_key');
+    localStorage.removeItem('tf_tomtom_key');
+    localStorage.removeItem('tf_open_weather_key');
+    localStorage.setItem('tf_ai_provider', 'gemini');
+    localStorage.removeItem('tf_ai_key');
     setUser(null);
   };
 
