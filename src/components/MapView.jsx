@@ -258,10 +258,20 @@ export default function MapView({
 
     // Draw only the currently selected route on the map
     if (routeOptions && routeOptions.length > 0) {
-      const routeColor = '#3b82f6';
       const route = routeOptions[selectedRouteIndex];
       // Safety: skip if route or geometry is missing/invalid
       if (!route || !route.geometry || route.geometry.length < 2) return;
+
+      let routeColor = '#3b82f6';
+      if (route.trafficStatus === 'smooth') {
+        routeColor = '#10b981';
+      } else if (route.trafficStatus === 'moderate') {
+        routeColor = '#f59e0b';
+      } else if (route.trafficStatus === 'heavy') {
+        routeColor = '#ef4444';
+      } else if (route.trafficStatus === 'blocked') {
+        routeColor = '#7f1d1d';
+      }
 
       const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
 
