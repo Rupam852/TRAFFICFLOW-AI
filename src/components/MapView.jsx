@@ -91,6 +91,8 @@ export default function MapView({
   onAmenitiesSearchFallback,
   activeRoutingEngine,
   routingError,
+  isRoutesLoading,
+  isRouteSwitching,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -583,6 +585,18 @@ export default function MapView({
 
   return (
     <div style={styles.container}>
+      {/* Route Calculation/Switching Map Overlay */}
+      {(isRoutesLoading || isRouteSwitching) && (
+        <div style={styles.mapLoaderOverlay}>
+          <div style={styles.mapLoaderCard}>
+            <div className="route-switch-spinner" />
+            <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-primary)' }}>
+              {isRoutesLoading ? 'Calculating optimal paths...' : 'Recalculating traffic telemetry...'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {gmapsError ? (
         <div style={styles.errorBanner}>
           <h3>Google Maps API Error</h3>
@@ -855,5 +869,29 @@ const styles = {
     color: 'rgba(255,255,255,0.7)',
     marginTop: '2px',
     fontWeight: '500',
+  },
+  mapLoaderOverlay: {
+    position: 'absolute',
+    inset: 0,
+    background: 'rgba(15, 23, 42, 0.35)',
+    backdropFilter: 'blur(3px)',
+    zIndex: 9999,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'var(--transition-smooth)',
+  },
+  mapLoaderCard: {
+    padding: '20px 24px',
+    borderRadius: '16px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '12px',
+    boxShadow: 'var(--shadow-lg)',
+    backgroundColor: 'var(--bg-glass)',
+    border: '1px solid var(--border-color)',
+    maxWidth: '280px',
+    textAlign: 'center',
   },
 };

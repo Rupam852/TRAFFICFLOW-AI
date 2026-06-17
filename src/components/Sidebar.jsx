@@ -29,7 +29,9 @@ export default function Sidebar({
   travelMode,
   onTravelModeChange,
   isSimulationMode,
-  routingError
+  routingError,
+  isRoutesLoading,
+  isRouteSwitching
 }) {
   const [activeTab, setActiveTab] = useState('nav'); // 'nav' or 'ai'
   const [startInput, setStartInput] = useState(startLocation?.name || '');
@@ -805,10 +807,12 @@ export default function Sidebar({
             </div>
 
             {/* Alternative Routes display */}
-            {routeOptions && routeOptions.length > 0 && (
+            {((routeOptions && routeOptions.length > 0) || isRoutesLoading) && (
               <div style={styles.section}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={styles.sectionTitle}>Calculated Routes</span>
+                  <span style={styles.sectionTitle}>
+                    {isRoutesLoading ? 'Calculating Routes...' : 'Calculated Routes'}
+                  </span>
                   <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                     <select
                       value={travelMode}
@@ -825,81 +829,104 @@ export default function Sidebar({
                     </button>
                   </div>
                 </div>
-                <div style={styles.routesList}>
-                  {routeOptions.map((route, idx) => {
-                    const isSelected = idx === selectedRouteIndex;
-                    
-                    let statusColor = 'var(--traffic-smooth)';
-                    if (route.trafficStatus === 'moderate') statusColor = 'var(--traffic-moderate)';
-                    if (route.trafficStatus === 'heavy') statusColor = 'var(--traffic-heavy)';
-                    if (route.trafficStatus === 'blocked') statusColor = 'var(--traffic-blocked)';
-
-                    return (
-                      <div
-                        key={idx}
-                        onClick={() => onRouteSelected(idx)}
-                        style={{
-                          ...styles.routeCard,
-                          borderColor: isSelected ? 'var(--primary)' : 'var(--border-color)',
-                          background: isSelected ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-                        }}
-                      >
-                        <div style={styles.routeHeader}>
-                          <span style={styles.routeName}>{route.name}</span>
-                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            {route.isRecommended && (
-                              <span style={styles.recommendedBadge}>RECOMMENDED</span>
-                            )}
-                             {isSelected && (
-                              <span style={{
-                                fontSize: '0.62rem',
-                                fontWeight: '800',
-                                color: '#10b981',
-                                border: '1px solid rgba(16, 185, 129, 0.3)',
-                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                padding: '2px 6px',
-                                borderRadius: '10px',
-                                letterSpacing: '0.04em',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '3px'
-                              }}>
-                                <span className="pulse-dot" style={{
-                                  width: '5px',
-                                  height: '5px',
-                                  borderRadius: '50%',
-                                  backgroundColor: '#10b981',
-                                  display: 'inline-block'
-                                }} />
-                                LIVE
-                              </span>
-                            )}
-                            <span style={{ ...styles.trafficBadge, backgroundColor: statusColor }}>
-                              {route.trafficStatus.toUpperCase()}
-                            </span>
+                <div style={{ ...styles.routesList, position: 'relative' }}>
+                  {isRoutesLoading ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {[1, 2, 3].map((n) => (
+                        <div key={n} className="skeleton-card skeleton-pulse" style={{ marginBottom: '4px' }}>
+                          <div className="skeleton-header">
+                            <div className="skeleton-title" />
+                            <div className="skeleton-badge" />
                           </div>
+                          <div className="skeleton-stats" style={{ marginTop: '8px' }} />
                         </div>
-                        <div style={styles.routeStats}>
-                          <span style={styles.routeStatVal}>{route.duration}</span>
-                          <span style={styles.routeStatSep}>•</span>
-                          <span>{route.distance}</span>
-                        </div>
-                        {route.delayInfo && (
-                          <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {routeOptions.length === 1 && (
-                    <div style={styles.noAlternativesText}>
-                      ℹ️ No other alternative routes available.
+                      ))}
                     </div>
+                  ) : (
+                    <>
+                      {routeOptions.map((route, idx) => {
+                        const isSelected = idx === selectedRouteIndex;
+                        
+                        let statusColor = 'var(--traffic-smooth)';
+                        if (route.trafficStatus === 'moderate') statusColor = 'var(--traffic-moderate)';
+                        if (route.trafficStatus === 'heavy') statusColor = 'var(--traffic-heavy)';
+                        if (route.trafficStatus === 'blocked') statusColor = 'var(--traffic-blocked)';
+
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => onRouteSelected(idx)}
+                            style={{
+                              ...styles.routeCard,
+                              borderColor: isSelected ? 'var(--primary)' : 'var(--border-color)',
+                              background: isSelected ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+                            }}
+                          >
+                            <div style={styles.routeHeader}>
+                              <span style={styles.routeName}>{route.name}</span>
+                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                {route.isRecommended && (
+                                  <span style={styles.recommendedBadge}>RECOMMENDED</span>
+                                )}
+                                 {isSelected && (
+                                  <span style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: '800',
+                                    color: '#10b981',
+                                    border: '1px solid rgba(16, 185, 129, 0.3)',
+                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                    padding: '2px 6px',
+                                    borderRadius: '10px',
+                                    letterSpacing: '0.04em',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '3px'
+                                  }}>
+                                    <span className="pulse-dot" style={{
+                                      width: '5px',
+                                      height: '5px',
+                                      borderRadius: '50%',
+                                      backgroundColor: '#10b981',
+                                      display: 'inline-block'
+                                    }} />
+                                    LIVE
+                                  </span>
+                                )}
+                                <span style={{ ...styles.trafficBadge, backgroundColor: statusColor }}>
+                                  {route.trafficStatus.toUpperCase()}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={styles.routeStats}>
+                              <span style={styles.routeStatVal}>{route.duration}</span>
+                              <span style={styles.routeStatSep}>•</span>
+                              <span>{route.distance}</span>
+                            </div>
+                            {route.delayInfo && (
+                              <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      {routeOptions.length === 1 && (
+                        <div style={styles.noAlternativesText}>
+                          ℹ️ No other alternative routes available.
+                        </div>
+                      )}
+
+                      {routeOptions.length === 0 && (
+                        <div style={styles.noAlternativesText}>
+                          ⚠️ No possible routes found for this trip.
+                        </div>
+                      )}
+                    </>
                   )}
 
-                  {routeOptions.length === 0 && (
-                    <div style={styles.noAlternativesText}>
-                      ⚠️ No possible routes found for this trip.
+                  {isRouteSwitching && (
+                    <div className="route-switch-overlay">
+                      <div className="route-switch-spinner" />
+                      <span className="route-switch-text">Analyzing path & traffic...</span>
                     </div>
                   )}
                 </div>

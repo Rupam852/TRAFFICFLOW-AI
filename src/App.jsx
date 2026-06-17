@@ -162,6 +162,8 @@ export default function App() {
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [routingError, setRoutingError] = useState(null);
   const [activeRoutingEngine, setActiveRoutingEngine] = useState(null); // 'mapbox' | 'osrm' | 'simulation'
+  const [isRoutesLoading, setIsRoutesLoading] = useState(false);
+  const [isRouteSwitching, setIsRouteSwitching] = useState(false);
 
   // Weather & Time States
   const [weather, setWeather] = useState(localStorage.getItem('tf_weather') || 'clear');
@@ -533,7 +535,9 @@ export default function App() {
     }
 
     const fetchRoutes = async () => {
-      let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
+      setIsRoutesLoading(true);
+      try {
+        let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
       let mapboxErrorMsg = null;
 
       // If start is "My Current Location", fetch fresh GPS coordinates first
@@ -842,6 +846,9 @@ export default function App() {
       setActiveRoutingEngine('simulation');
       setRouteOptions(mockRoutes);
       setSelectedRouteIndex(0);
+      } finally {
+        setIsRoutesLoading(false);
+      }
     };
 
     fetchRoutes();
@@ -1202,6 +1209,15 @@ export default function App() {
     setDestination({ name: poi.name, coordinates: poi.coordinates });
   };
 
+  const handleRouteSelected = (idx) => {
+    if (idx === selectedRouteIndex) return;
+    setIsRouteSwitching(true);
+    setSelectedRouteIndex(idx);
+    setTimeout(() => {
+      setIsRouteSwitching(false);
+    }, 450);
+  };
+
 
 
   if (authLoading) {
@@ -1334,7 +1350,9 @@ export default function App() {
         setDestination={setDestination}
         routeOptions={routeOptions}
         selectedRouteIndex={selectedRouteIndex}
-        onRouteSelected={setSelectedRouteIndex}
+        onRouteSelected={handleRouteSelected}
+        isRoutesLoading={isRoutesLoading}
+        isRouteSwitching={isRouteSwitching}
         bookmarks={bookmarks}
         onAddBookmark={handleAddBookmark}
         onSelectBookmark={handleSelectBookmark}
@@ -1360,7 +1378,9 @@ export default function App() {
         destination={destination}
         routeOptions={routeOptions}
         selectedRouteIndex={selectedRouteIndex}
-        onRouteSelected={setSelectedRouteIndex}
+        onRouteSelected={handleRouteSelected}
+        isRoutesLoading={isRoutesLoading}
+        isRouteSwitching={isRouteSwitching}
         weather={weather}
         setWeather={setWeather}
         timeOfDay={timeOfDay}
