@@ -69,7 +69,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
             <span style={styles.warningTitle}>API Keys Disclaimer & Security Warning</span>
             <span style={styles.warningText}>
-              Your API keys are stored locally inside your browser cache (`localStorage`) and are used directly to query the provider endpoints. The developer takes no responsibility, does not host, and never stores these keys on any remote backend. Always set budgets/restrictions on your keys.
+              Your API keys are stored securely in your personal account database (via Supabase Row Level Security) and are used directly by the client to query provider endpoints. They are never shared, collected, or stored on any central developer server. Always set budgets and restrictions on your keys.
             </span>
           </div>
         </div>
