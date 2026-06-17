@@ -1012,14 +1012,14 @@ h1, h2, h3, h4, h5, h6 {
 
   .routing-status-responsive {
     position: absolute !important;
-    top: 80px !important;
-    left: 50% !important;
+    top: 21px !important;
+    left: 74px !important;
     right: auto !important;
-    transform: translateX(-50%) !important;
+    transform: none !important;
     padding: 8px 12px !important;
-    border-radius: 8px !important;
+    border-radius: 20px !important;
     font-size: 0.75rem !important;
-    max-width: calc(100% - 32px) !important;
+    max-width: calc(100% - 140px) !important;
     z-index: 1000 !important;
   }
 
