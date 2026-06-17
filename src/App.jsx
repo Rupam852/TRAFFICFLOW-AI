@@ -211,6 +211,48 @@ export default function App() {
   const [showWarningOnLogin, setShowWarningOnLogin] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  // Lifted UI overlay states
+  const [isWeatherPanelOpen, setIsWeatherPanelOpen] = useState(false);
+  const [sidebarActiveTab, setSidebarActiveTab] = useState('nav');
+
+  const sidebarRef = useRef(null);
+
+  // Ref to track dashboard state in the popstate listener without stale closure issues
+  const dashboardStateRef = useRef({});
+  useEffect(() => {
+    dashboardStateRef.current = {
+      isSettingsOpen,
+      isShareEtaOpen,
+      showWarningOnLogin,
+      dismissedKeySetup,
+      isSyncingSettings,
+      settings,
+      isWeatherPanelOpen,
+      isSidebarOpen,
+      sidebarActiveTab,
+      isRouteSimulationActive,
+      activeAmenitySearch,
+      pois,
+      destination,
+      showExitConfirm,
+    };
+  }, [
+    isSettingsOpen,
+    isShareEtaOpen,
+    showWarningOnLogin,
+    dismissedKeySetup,
+    isSyncingSettings,
+    settings,
+    isWeatherPanelOpen,
+    isSidebarOpen,
+    sidebarActiveTab,
+    isRouteSimulationActive,
+    activeAmenitySearch,
+    pois,
+    destination,
+    showExitConfirm,
+  ]);
+
   // Synchronize authMode view with URL query parameters for browser navigation support
   useEffect(() => {
     const handlePopState = () => {
@@ -391,7 +433,7 @@ export default function App() {
   }, [authMode]);
 
   // Intercept browser back button on the main dashboard (when user is logged in)
-  // and show an Exit App confirmation dialog instead of navigating away
+  // and close open components in a layered, priority-based order instead of navigating away
   useEffect(() => {
     if (!user) return; // Only active when logged in
 
@@ -399,7 +441,111 @@ export default function App() {
     window.history.pushState({ dashboard: true }, '');
 
     const handleDashboardPopState = (e) => {
-      // Re-push so back is always intercepted while dialog is not shown
+      const {
+        isSettingsOpen,
+        isShareEtaOpen,
+        showWarningOnLogin,
+        dismissedKeySetup,
+        isSyncingSettings,
+        settings,
+        isWeatherPanelOpen,
+        isSidebarOpen,
+        sidebarActiveTab,
+        isRouteSimulationActive,
+        activeAmenitySearch,
+        pois,
+        destination,
+        showExitConfirm,
+      } = dashboardStateRef.current;
+
+      // 1. Settings Modal
+      if (isSettingsOpen) {
+        setIsSettingsOpen(false);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 2. Share ETA Modal
+      if (isShareEtaOpen) {
+        setIsShareEtaOpen(false);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 3. First-Login Warning
+      if (showWarningOnLogin) {
+        setShowWarningOnLogin(false);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 4. API Key setup card (if showing and not dismissed)
+      const isKeySetupVisible = (!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && !dismissedKeySetup && !isSyncingSettings;
+      if (isKeySetupVisible) {
+        setDismissedKeySetup(true);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 5. Climate Engine / Weather Panel
+      if (isWeatherPanelOpen) {
+        setIsWeatherPanelOpen(false);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 6. Sidebar suggestions or focused field
+      if (sidebarRef.current && sidebarRef.current.closePopups()) {
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 7. Sidebar drawer on mobile
+      if (window.innerWidth <= 640 && isSidebarOpen) {
+        setIsSidebarOpen(false);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 8. Sidebar active tab (if 'ai', switch back to 'nav')
+      if (sidebarActiveTab === 'ai') {
+        setSidebarActiveTab('nav');
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 9. Active Route Simulation
+      if (isRouteSimulationActive) {
+        stopRouteSimulation();
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 10. Active Amenity / POIs on Map
+      if (activeAmenitySearch || (pois && pois.length > 0)) {
+        setActiveAmenitySearch(null);
+        setPois([]);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 11. Destination selected (Viewing route details)
+      if (destination) {
+        setDestination(null);
+        setStartLocation(null);
+        setRouteOptions([]);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 12. If exit confirm is already open, back button should close it
+      if (showExitConfirm) {
+        setShowExitConfirm(false);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 13. Otherwise, show the Exit confirmation modal
       window.history.pushState({ dashboard: true }, '');
       setShowExitConfirm(true);
     };
@@ -1687,6 +1833,7 @@ export default function App() {
       )}
 
       <Sidebar
+        ref={sidebarRef}
         settings={settings}
         gmapsLoaded={gmapsLoaded}
         isSidebarOpen={isSidebarOpen}
@@ -1714,6 +1861,8 @@ export default function App() {
         isRouteSimulationActive={isRouteSimulationActive}
         onStartSimulation={startRouteSimulation}
         onStopSimulation={stopRouteSimulation}
+        activeTab={sidebarActiveTab}
+        setActiveTab={setSidebarActiveTab}
       />
 
       {(!settings.googleMapsKey || !settings.mapboxKey) && !isSyncingSettings ? (
@@ -1766,6 +1915,8 @@ export default function App() {
           activeRoutingEngine={activeRoutingEngine}
           routingError={routingError}
           isRouteSimulationActive={isRouteSimulationActive}
+          isWeatherPanelOpen={isWeatherPanelOpen}
+          setIsWeatherPanelOpen={setIsWeatherPanelOpen}
         />
       )}
 

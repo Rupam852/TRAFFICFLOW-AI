@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { MapPin, Navigation, History, Map, MessageSquareText, Trash2, LogOut } from 'lucide-react';
 import AiPanel from './AiPanel';
 import { incrementApiUsage } from '../utils/usage';
 
-export default function Sidebar({
+const Sidebar = forwardRef(function Sidebar({
   settings,
   isSidebarOpen,
   onCollapse,
@@ -29,9 +29,10 @@ export default function Sidebar({
   isRouteSwitching,
   isRouteSimulationActive,
   onStartSimulation,
-  onStopSimulation
-}) {
-  const [activeTab, setActiveTab] = useState('nav'); // 'nav' or 'ai'
+  onStopSimulation,
+  activeTab,
+  setActiveTab
+}, ref) {
   const [startInput, setStartInput] = useState(startLocation?.name || '');
   const [destInput, setDestInput] = useState(destination?.name || '');
 
@@ -39,6 +40,19 @@ export default function Sidebar({
   const [startSuggestions, setStartSuggestions] = useState([]);
   const [destSuggestions, setDestSuggestions] = useState([]);
   const [focusedField, setFocusedField] = useState(null);
+
+  useImperativeHandle(ref, () => ({
+    closePopups() {
+      let closedSomething = false;
+      if (startSuggestions.length > 0 || destSuggestions.length > 0 || focusedField !== null) {
+        setStartSuggestions([]);
+        setDestSuggestions([]);
+        setFocusedField(null);
+        closedSomething = true;
+      }
+      return closedSomething;
+    }
+  }));
 
   const startInputRef = useRef(null);
   const destInputRef = useRef(null);
@@ -773,7 +787,7 @@ export default function Sidebar({
     </div>
     </>
   );
-}
+});
 
 const styles = {
   sidebar: {
@@ -1110,3 +1124,5 @@ const styles = {
     lineHeight: '1.4',
   },
 };
+
+export default Sidebar;

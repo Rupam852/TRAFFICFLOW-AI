@@ -94,6 +94,8 @@ export default function MapView({
   isRoutesLoading,
   isRouteSwitching,
   isRouteSimulationActive,
+  isWeatherPanelOpen,
+  setIsWeatherPanelOpen,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -104,7 +106,6 @@ export default function MapView({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [gmapsError, setGmapsError] = useState(false);
   const [autoFollow, setAutoFollow] = useState(true);
-  const [isWeatherPanelOpen, setIsWeatherPanelOpen] = useState(false);
   const [isNetworkOnline, setIsNetworkOnline] = useState(navigator.onLine);
 
   useEffect(() => {
