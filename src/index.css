@@ -81,12 +81,6 @@
   padding: 0;
 }
 
-html {
-  /* Reserve a stable gutter for scrollbar so content width NEVER shifts
-     when scrollbar appears or disappears — fixes text alignment jumps */
-  scrollbar-gutter: stable;
-}
-
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
@@ -155,44 +149,50 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
-/* Custom Scrollbars - Hidden by default, transparent, visible on hover.
-   scrollbar-width: none + scrollbar-gutter: stable on html means the
-   browser reserves the scrollbar slot but renders it invisibly,
-   so content width is always constant — no text alignment shift. */
+/* ─── Custom Scrollbars ───────────────────────────────────────────────────
+   Strategy:
+   • Track width = 0 by default → completely invisible, takes NO space
+   • On hover over a scrollable element → track expands to 5px + faint thumb
+   • On hover over the thumb itself → accent color highlight
+   • overflow: auto on containers means scrollbar only appears when content
+     actually overflows, so no track is ever shown for non-scrolling panels
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Firefox */
 * {
-  scrollbar-width: none;       /* Firefox: hide scrollbar track completely */
+  scrollbar-width: none;             /* Completely hidden by default */
   scrollbar-color: transparent transparent;
 }
-
-/* Show a faint scrollbar only when the element is being hovered */
 *:hover {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  scrollbar-width: thin;             /* Appear faintly on hover */
+  scrollbar-color: rgba(148, 163, 184, 0.30) transparent;
 }
 
-/* Webkit (Chrome/Safari/Edge) — hide by default */
+/* Webkit (Chrome / Edge / Safari) */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 0;                          /* 0px default → invisible, no layout shift */
+  height: 0;
+  transition: width 0.3s ease;
 }
-
 ::-webkit-scrollbar-track {
   background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 4px;
+}
+
+/* Expand only when the element is hovered */
+*:hover::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.30);
   transition: background 0.3s ease;
 }
-
-/* Show on hover — smooth fade in */
-*:hover::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.35);
-}
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.65) !important;
+  background: rgba(99, 102, 241, 0.60) !important;
 }
 
 /* Layout Utilities */
