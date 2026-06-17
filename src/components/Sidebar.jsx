@@ -787,6 +787,7 @@ const styles = {
     borderTopRightRadius: '16px',
     borderBottomRightRadius: '16px',
     borderLeft: 'none',
+    borderRight: 'none',
     zIndex: 200,
     flexShrink: 0,
   },
