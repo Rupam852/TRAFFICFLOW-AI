@@ -387,6 +387,38 @@ export default function App() {
     localStorage.setItem('tf_weather', weather);
   }, [weather]);
 
+  // Dynamic scrollbar visibility during scroll
+  useEffect(() => {
+    const scrollTimeouts = new WeakMap();
+
+    const handleScroll = (e) => {
+      let target = e.target;
+      if (target === document) {
+        target = document.documentElement;
+      }
+      if (!(target instanceof HTMLElement)) return;
+
+      target.classList.add('is-scrolling');
+
+      const existingTimeout = scrollTimeouts.get(target);
+      if (existingTimeout) {
+        clearTimeout(existingTimeout);
+      }
+
+      const timeoutId = setTimeout(() => {
+        target.classList.remove('is-scrolling');
+        scrollTimeouts.delete(target);
+      }, 800); // Hide smoothly after 800ms of no scrolling
+
+      scrollTimeouts.set(target, timeoutId);
+    };
+
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, []);
+
   // Dynamically control body overflow (scrollability) based on route/session
   useEffect(() => {
     if (!user && authMode === 'landing') {

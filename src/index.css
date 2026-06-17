@@ -149,20 +149,41 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
-/* ─── Hide Scrollbars Globally ───────────────────────────────────────────
-   Strategy: Completely hide scrollbars everywhere but keep scrolling functionality.
+/* ─── Scrollbars: Show on Scroll, Fade Out when Idle ──────────────────────────
+   Strategy:
+   • Scrollbars are 6px wide but transparent by default (no track/thumb visible).
+   • When scrolling occurs, JavaScript adds the '.is-scrolling' class.
+   • The thumb fades in (background becomes semi-transparent grey) with transition.
+   • When scrolling stops, the '.is-scrolling' class is removed and the thumb fades out.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* Firefox */
 * {
   scrollbar-width: none;
 }
+*.is-scrolling {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
 
 /* Webkit (Chrome / Edge / Safari) */
 ::-webkit-scrollbar {
-  width: 0px;
-  height: 0px;
-  display: none;
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+  transition: background-color 0.3s ease;
+}
+.is-scrolling::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+}
+.is-scrolling::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.70);
 }
 
 /* Layout Utilities */
