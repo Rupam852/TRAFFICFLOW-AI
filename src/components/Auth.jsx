@@ -75,8 +75,8 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.artSection}>
+    <div className="auth-container">
+      <div className="auth-art-section">
         <div style={styles.artContent}>
           <div style={styles.logoBadge}>
             <Navigation size={32} style={styles.logoIcon} />
@@ -109,8 +109,8 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
         </div>
       </div>
 
-      <div style={styles.formSection}>
-        <div className="glass-panel" style={styles.authCard}>
+      <div className="auth-form-section">
+        <div className="glass-panel auth-card">
           {onBackToLanding && (
             <button
               onClick={onBackToLanding}
@@ -248,26 +248,6 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
 }
 
 const styles = {
-  container: {
-    display: 'flex',
-    width: '100vw',
-    height: '100vh',
-    overflow: 'hidden',
-    fontFamily: 'var(--font-sans)',
-  },
-  artSection: {
-    flex: 1.2,
-    background: 'radial-gradient(circle at 10% 20%, #1e1e38 0%, #080711 90%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '48px',
-    color: '#ffffff',
-    position: 'relative',
-    '@media (max-width: 900px)': {
-      display: 'none',
-    }
-  },
   artContent: {
     maxWidth: '520px',
   },
@@ -328,21 +308,6 @@ const styles = {
     fontSize: '0.875rem',
     color: '#64748b',
     lineHeight: '1.4',
-  },
-  formSection: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '32px',
-    backgroundColor: 'var(--bg-primary)',
-    transition: 'background-color 0.3s ease',
-  },
-  authCard: {
-    width: '100%',
-    maxWidth: '420px',
-    padding: '40px',
-    borderRadius: '24px',
   },
   title: {
     fontSize: '1.75rem',

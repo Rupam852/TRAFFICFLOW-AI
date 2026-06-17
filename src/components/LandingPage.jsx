@@ -76,7 +76,7 @@ export default function LandingPage({ onNavigate }) {
             <span style={styles.logoText}>TRAFFICFLOW <span style={styles.logoHighlight}>AI</span></span>
           </div>
           
-          <nav style={styles.desktopNav}>
+          <nav className="landing-desktop-nav">
             <a href="#features" style={styles.navLink}>Features</a>
             <a href="#how-it-works" style={styles.navLink}>How it Works</a>
             <a href="#faqs" style={styles.navLink}>FAQs</a>
@@ -109,13 +109,13 @@ export default function LandingPage({ onNavigate }) {
               <span style={styles.badgeDot}>•</span>
               <span>Next-Gen Smart Navigation</span>
             </div>
-            <h1 style={styles.heroTitle}>
+            <h1 className="landing-hero-title">
               Navigate Smarter with <span style={styles.gradientText}>AI-Powered</span> Route Optimization
             </h1>
-            <p style={styles.heroDesc}>
+            <p className="landing-hero-desc">
               TrafficFlow AI combines real-time traffic telemetry, advanced weather canvas layers, and state-of-the-art artificial intelligence models to deliver the ultimate route optimization experience.
             </p>
-            <div style={styles.ctaGroup}>
+            <div className="landing-cta-group">
               <button onClick={() => onNavigate('signup')} style={styles.ctaPrimaryGlow}>
                 Get Started for Free
                 <ArrowRight size={18} style={{ marginLeft: '6px' }} />
@@ -130,7 +130,7 @@ export default function LandingPage({ onNavigate }) {
 
       {/* Stats Banner */}
       <section style={styles.statsSection}>
-        <div style={styles.statsContainer}>
+        <div className="landing-stats-container">
           {stats.map((s, idx) => (
             <div key={idx} style={styles.statCard}>
               <div style={styles.statValue}>{s.value}</div>
@@ -148,7 +148,7 @@ export default function LandingPage({ onNavigate }) {
           <p style={styles.sectionDesc}>Explore the state-of-the-art tools and components backing our traffic routing engine.</p>
         </div>
 
-        <div style={styles.featuresGrid}>
+        <div className="landing-features-grid">
           {features.map((f, idx) => (
             <div 
               key={idx} 
@@ -178,20 +178,20 @@ export default function LandingPage({ onNavigate }) {
           <p style={styles.sectionDesc}>Configuring your personal AI optimization environment is quick and secure.</p>
         </div>
 
-        <div style={styles.stepsLayout}>
-          <div style={styles.stepItem}>
+        <div className="landing-steps-layout">
+          <div className="landing-step-item">
             <div style={styles.stepNumber}>01</div>
             <h3 style={styles.stepTitle}>Create Your Secure Account</h3>
             <p style={styles.stepDesc}>Register with email or Google to enable persistent database storage for user settings.</p>
           </div>
-          <div style={styles.stepDivider} />
-          <div style={styles.stepItem}>
+          <div className="landing-step-divider" />
+          <div className="landing-step-item">
             <div style={styles.stepNumber}>02</div>
             <h3 style={styles.stepTitle}>Configure API Keys</h3>
             <p style={styles.stepDesc}>Add Mapbox, Google Maps, or Weather keys. Your keys stay secure in local cache or private rows.</p>
           </div>
-          <div style={styles.stepDivider} />
-          <div style={styles.stepItem}>
+          <div className="landing-step-divider" />
+          <div className="landing-step-item">
             <div style={styles.stepNumber}>03</div>
             <h3 style={styles.stepTitle}>Plan & Optimize</h3>
             <p style={styles.stepDesc}>Set routes, visualize weather simulations, and let the AI models find optimal paths.</p>
@@ -206,7 +206,7 @@ export default function LandingPage({ onNavigate }) {
           <p style={styles.sectionDesc}>Got questions? We have compiled the essential answers below.</p>
         </div>
 
-        <div style={styles.faqContainer}>
+        <div className="landing-faq-container">
           {faqs.map((faq, idx) => {
             const isOpen = activeFaq === idx;
             return (
@@ -242,7 +242,7 @@ export default function LandingPage({ onNavigate }) {
 
       {/* Footer */}
       <footer style={styles.footer}>
-        <div style={styles.footerContent}>
+        <div className="landing-footer-content">
           <div style={styles.footerBrand}>
             <div style={styles.logoBadge}>
               <Navigation size={20} style={styles.logoIcon} />
@@ -250,7 +250,7 @@ export default function LandingPage({ onNavigate }) {
             </div>
             <p style={styles.footerBrandDesc}>High-fidelity AI navigation, traffic telemetry analytics, and weather cycle integrations.</p>
           </div>
-          <div style={styles.footerLinks}>
+          <div className="landing-footer-links">
             <div style={styles.footerLinkCol}>
               <h4 style={styles.footerColTitle}>Navigation</h4>
               <a href="#features" style={styles.footerLink}>Features</a>
@@ -317,13 +317,6 @@ const styles = {
   },
   logoHighlight: {
     color: '#6366f1',
-  },
-  desktopNav: {
-    display: 'flex',
-    gap: '32px',
-    '@media (max-width: 768px)': {
-      display: 'none',
-    }
   },
   navLink: {
     color: '#94a3b8',
@@ -409,37 +402,10 @@ const styles = {
     color: '#6366f1',
     animation: 'pulse 2s infinite',
   },
-  heroTitle: {
-    fontSize: '3rem',
-    fontWeight: '800',
-    lineHeight: '1.15',
-    letterSpacing: '-0.04em',
-    marginBottom: '20px',
-    color: '#ffffff',
-    '@media (max-width: 640px)': {
-      fontSize: '2.25rem',
-    }
-  },
   gradientText: {
     background: 'linear-gradient(135deg, #818cf8 0%, #6366f1 100%)',
     WebkitBackgroundClip: 'text',
     WebkitTextFillColor: 'transparent',
-  },
-  heroDesc: {
-    fontSize: '1.1rem',
-    color: '#94a3b8',
-    lineHeight: '1.6',
-    marginBottom: '36px',
-    maxWidth: '700px',
-    margin: '0 auto 36px auto',
-  },
-  ctaGroup: {
-    display: 'flex',
-    gap: '16px',
-    '@media (max-width: 480px)': {
-      flexDirection: 'column',
-      width: '100%',
-    }
   },
   ctaPrimaryGlow: {
     background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
@@ -479,113 +445,11 @@ const styles = {
       borderColor: 'rgba(255,255,255,0.25)'
     }
   },
-  heroRight: {
-    flex: 0.9,
-    width: '100%',
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  dashboardMockup: {
-    width: '100%',
-    maxWidth: '480px',
-    borderRadius: '20px',
-    overflow: 'hidden',
-    boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-  },
-  mockHeader: {
-    backgroundColor: '#0c0a1a',
-    padding: '10px 16px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '16px',
-    borderBottom: '1px solid var(--border-color)',
-  },
-  mockDots: {
-    display: 'flex',
-    gap: '6px',
-  },
-  mockDot: {
-    width: '8px',
-    height: '8px',
-    borderRadius: '50%',
-  },
-  mockAddressBar: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    border: '1px solid rgba(255,255,255,0.05)',
-    borderRadius: '6px',
-    padding: '4px 12px',
-    fontSize: '0.75rem',
-    color: 'var(--text-muted)',
-    display: 'flex',
-    alignItems: 'center',
-  },
-  mockContent: {
-    backgroundColor: '#0a0915',
-    padding: '16px',
-    height: '320px',
-    position: 'relative',
-  },
-  mockMapContainer: {
-    width: '100%',
-    height: '100%',
-    background: 'radial-gradient(circle at center, #131126 0%, #080711 100%)',
-    borderRadius: '12px',
-    overflow: 'hidden',
-    position: 'relative',
-    border: '1px solid rgba(255,255,255,0.05)',
-  },
-  mapGrid: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundImage: 'linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)',
-    backgroundSize: '20px 20px',
-  },
-  mapSvg: {
-    width: '100%',
-    height: '100%',
-    position: 'absolute',
-    top: 0,
-    left: 0,
-  },
-  mockOverlayPanel: {
-    position: 'absolute',
-    bottom: '12px',
-    left: '12px',
-    right: '12px',
-    padding: '12px',
-    borderRadius: '10px',
-    border: '1px solid rgba(255,255,255,0.08)',
-  },
-  mockWeatherLayer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: '50%',
-    pointerEvents: 'none',
-  },
   statsSection: {
     borderTop: '1px solid var(--border-color)',
     borderBottom: '1px solid var(--border-color)',
     background: 'rgba(255,255,255,0.005)',
     padding: '40px 24px',
-  },
-  statsContainer: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '24px',
-    '@media (max-width: 768px)': {
-      gridTemplateColumns: 'repeat(2, 1fr)',
-    },
-    '@media (max-width: 480px)': {
-      gridTemplateColumns: '1fr',
-    }
   },
   statCard: {
     textAlign: 'center',
@@ -633,14 +497,6 @@ const styles = {
     color: '#94a3b8',
     lineHeight: '1.5',
   },
-  featuresGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    gap: '24px',
-    '@media (max-width: 768px)': {
-      gridTemplateColumns: '1fr',
-    }
-  },
   featureCard: {
     padding: '36px',
     borderRadius: '20px',
@@ -685,26 +541,6 @@ const styles = {
     color: '#94a3b8',
     lineHeight: '1.55',
   },
-  stepsLayout: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '24px',
-    '@media (max-width: 840px)': {
-      flexDirection: 'column',
-      textAlign: 'center',
-      gap: '48px',
-    }
-  },
-  stepItem: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-    '@media (max-width: 840px)': {
-      alignItems: 'center',
-    }
-  },
   stepNumber: {
     fontSize: '2.5rem',
     fontWeight: '800',
@@ -722,21 +558,6 @@ const styles = {
     fontSize: '0.875rem',
     color: '#94a3b8',
     lineHeight: '1.5',
-  },
-  stepDivider: {
-    width: '48px',
-    height: '1px',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    '@media (max-width: 840px)': {
-      display: 'none',
-    }
-  },
-  faqContainer: {
-    maxWidth: '720px',
-    margin: '0 auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
   },
   faqItem: {
     borderRadius: '16px',
@@ -805,18 +626,6 @@ const styles = {
     backgroundColor: '#05040a',
     padding: '60px 24px 30px 24px',
   },
-  footerContent: {
-    maxWidth: '1200px',
-    margin: '0 auto',
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '48px',
-    marginBottom: '48px',
-    '@media (max-width: 768px)': {
-      flexDirection: 'column',
-      gap: '36px',
-    }
-  },
   footerBrand: {
     maxWidth: '320px',
   },
@@ -830,14 +639,6 @@ const styles = {
     color: '#64748b',
     lineHeight: '1.5',
     marginTop: '16px',
-  },
-  footerLinks: {
-    display: 'flex',
-    gap: '64px',
-    '@media (max-width: 480px)': {
-      gap: '32px',
-      flexWrap: 'wrap',
-    }
   },
   footerLinkCol: {
     display: 'flex',

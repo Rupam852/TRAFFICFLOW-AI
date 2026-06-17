@@ -660,3 +660,225 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--text-secondary);
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Responsive Landing Page & Auth Flow Styles
+   ────────────────────────────────────────────────────────────────────────── */
+
+/* Header / Navigation */
+.landing-desktop-nav {
+  display: flex;
+  gap: 32px;
+}
+
+@media (max-width: 768px) {
+  .landing-desktop-nav {
+    display: none !important;
+  }
+}
+
+/* Hero Title and Description */
+.landing-hero-title {
+  font-size: 3rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+  margin-bottom: 20px;
+  color: #ffffff;
+}
+
+.landing-hero-desc {
+  font-size: 1.15rem;
+  color: #94a3b8;
+  line-height: 1.6;
+  margin-bottom: 36px;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+@media (max-width: 640px) {
+  .landing-hero-title {
+    font-size: 2.25rem !important;
+  }
+  .landing-hero-desc {
+    font-size: 0.95rem !important;
+    margin-bottom: 24px !important;
+  }
+}
+
+/* CTA Group */
+.landing-cta-group {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+@media (max-width: 480px) {
+  .landing-cta-group {
+    flex-direction: column !important;
+    width: 100% !important;
+  }
+}
+
+/* Stats Grid */
+.landing-stats-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .landing-stats-container {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .landing-stats-container {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+}
+
+/* Features Grid */
+.landing-features-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .landing-features-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Steps Layout */
+.landing-steps-layout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.landing-step-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.landing-step-divider {
+  width: 48px;
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 840px) {
+  .landing-steps-layout {
+    flex-direction: column !important;
+    text-align: center !important;
+    gap: 48px !important;
+  }
+  .landing-step-item {
+    align-items: center !important;
+  }
+  .landing-step-divider {
+    display: none !important;
+  }
+}
+
+/* FAQ Container */
+.landing-faq-container {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Footer */
+.landing-footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  gap: 48px;
+  margin-bottom: 48px;
+}
+
+.landing-footer-links {
+  display: flex;
+  gap: 64px;
+}
+
+@media (max-width: 768px) {
+  .landing-footer-content {
+    flex-direction: column !important;
+    gap: 36px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .landing-footer-links {
+    gap: 32px !important;
+    flex-wrap: wrap !important;
+  }
+}
+
+/* Auth Page Layout */
+.auth-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  font-family: var(--font-sans);
+}
+
+.auth-art-section {
+  flex: 1.2;
+  background: radial-gradient(circle at 10% 20%, #1e1e38 0%, #080711 90%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+  color: #ffffff;
+  position: relative;
+}
+
+.auth-form-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background-color: var(--bg-primary);
+  transition: background-color 0.3s ease;
+  overflow-y: auto;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 40px;
+  border-radius: 24px;
+}
+
+@media (max-width: 900px) {
+  .auth-art-section {
+    display: none !important;
+  }
+  .auth-form-section {
+    padding: 16px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-card {
+    padding: 24px !important;
+    border-radius: 16px !important;
+  }
+}
+
