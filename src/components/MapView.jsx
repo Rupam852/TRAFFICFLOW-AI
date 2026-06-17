@@ -871,28 +871,21 @@ export default function MapView({
           style={styles.routingStatusBanner}
         >
           <div style={styles.statusRow}>
-            {activeRoutingEngine === 'mapbox' && (
-              <>
-                <span style={{ color: '#10b981', marginRight: '6px' }}>🟢</span>
-                <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>Mapbox Navigation Live</span>
-              </>
-            )}
-            {activeRoutingEngine === 'osrm' && (
-              <>
-                <span style={{ color: '#f59e0b', marginRight: '6px' }}>🟡</span>
-                <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>OpenStreetMap (OSRM) Backup</span>
-              </>
-            )}
-            {activeRoutingEngine === 'simulation' && (
+            {routingError ? (
               <>
                 <span style={{ color: '#ef4444', marginRight: '6px' }}>🔴</span>
-                <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>Simulation Mode Active</span>
+                <span style={{ fontWeight: '700', fontSize: '0.75rem', color: '#ef4444' }}>Offline</span>
+              </>
+            ) : (
+              <>
+                <span style={{ color: '#10b981', marginRight: '6px' }}>🟢</span>
+                <span style={{ fontWeight: '700', fontSize: '0.75rem', color: 'var(--traffic-smooth)' }}>Online</span>
               </>
             )}
           </div>
           {routingError && (
             <div style={styles.statusErrorText} title={routingError}>
-              {routingError.length > 70 ? routingError.substring(0, 67) + '...' : routingError}
+              {routingError.length > 50 ? routingError.substring(0, 47) + '...' : routingError}
             </div>
           )}
         </div>
@@ -983,18 +976,18 @@ const styles = {
     top: '20px',
     left: '50%',
     transform: 'translateX(-50%)',
-    padding: '10px 18px',
-    borderRadius: '12px',
+    padding: '6px 12px',
+    borderRadius: '20px',
     zIndex: 1000,
-    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-    border: '1px solid rgba(255,255,255,0.08)',
-    background: 'rgba(15,23,42,0.85)',
-    color: '#ffffff',
-    backdropFilter: 'blur(12px)',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.2)',
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-glass)',
+    color: 'var(--text-primary)',
+    backdropFilter: 'blur(8px)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '3px',
+    gap: '2px',
     maxWidth: '90%',
     width: 'auto',
     textAlign: 'center',
@@ -1007,10 +1000,10 @@ const styles = {
     fontSize: '0.8rem',
   },
   statusErrorText: {
-    fontSize: '0.7rem',
-    color: 'rgba(255,255,255,0.7)',
+    fontSize: '0.65rem',
+    color: '#ef4444',
     marginTop: '2px',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   mapLoaderOverlay: {
     position: 'absolute',
