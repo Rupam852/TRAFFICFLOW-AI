@@ -153,6 +153,9 @@ export default function MapView({
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
+          renderingType: 'VECTOR', // Enable WebGL Vector maps for rotation & tilt
+          tilt: 0,
+          heading: 0,
         });
 
         // Collapse sidebar on map click
@@ -428,10 +431,21 @@ export default function MapView({
     // Smoothly pan map to follow the navigator if autoFollow is active
     if (autoFollow) {
       mapRef.current.panTo(latlng);
+      if (hasBearing) {
+        mapRef.current.setHeading(navMarkerBearing);
+        mapRef.current.setTilt(45); // 3D navigation perspective
+      } else {
+        mapRef.current.setHeading(0);
+        mapRef.current.setTilt(0);
+      }
+    } else {
+      // Reset map view to 2D flat North-up when manual pan/drag is active
+      mapRef.current.setHeading(0);
+      mapRef.current.setTilt(0);
     }
   }, [navMarkerPos, navMarkerBearing, mapLoaded, autoFollow]);
 
-  // Handle automatic follow reset when route simulation starts
+  // Handle automatic follow reset when route simulation starts/stops
   useEffect(() => {
     if (isRouteSimulationActive) {
       setAutoFollow(true);
@@ -439,9 +453,18 @@ export default function MapView({
         const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
         mapRef.current.setZoom(16);
         mapRef.current.panTo(latlng);
+        mapRef.current.setTilt(45);
+        if (navMarkerBearing !== null && navMarkerBearing !== undefined) {
+          mapRef.current.setHeading(navMarkerBearing);
+        }
+      }
+    } else {
+      if (mapRef.current) {
+        mapRef.current.setTilt(0);
+        mapRef.current.setHeading(0);
       }
     }
-  }, [isRouteSimulationActive]);
+  }, [isRouteSimulationActive, navMarkerPos, navMarkerBearing]);
 
   // Handle active amenity searches around map center
   useEffect(() => {
