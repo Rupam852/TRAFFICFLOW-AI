@@ -526,6 +526,7 @@ export default function App() {
     const fetchRoutes = async () => {
       let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
       let googleMapsErrorMsg = null;
+      let mapboxErrorMsg = null;
 
       // If start is "My Current Location", fetch fresh GPS coordinates first
       if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
@@ -770,6 +771,9 @@ export default function App() {
             `https://api.mapbox.com/directions/v5/${mapboxProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&alternatives=true&access_token=${settings.mapboxKey}`
           );
           const data = await response.json();
+          if (!response.ok) {
+            throw new Error(data.message || `HTTP error ${response.status}`);
+          }
           if (data.routes && data.routes.length > 0) {
             incrementApiUsage('mapbox');
             const routesParsed = data.routes.map((r, index) => {
@@ -818,6 +822,7 @@ export default function App() {
           }
         } catch (error) {
           console.warn('Mapbox directions API failed, using fallback simulation:', error);
+          mapboxErrorMsg = error.message || 'Unknown Mapbox error';
         }
       }
 
@@ -884,8 +889,11 @@ export default function App() {
           const finalRoutes = await supplementWithRealRoads(routesParsed);
 
           setIsSimulationMode(false);
-          if (googleMapsErrorMsg) {
-            setRoutingError(`Google Directions API failed (${googleMapsErrorMsg}). Falling back to OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.`);
+          if (googleMapsErrorMsg || mapboxErrorMsg) {
+            let combined = '';
+            if (googleMapsErrorMsg) combined += `Google: ${googleMapsErrorMsg} `;
+            if (mapboxErrorMsg) combined += `Mapbox: ${mapboxErrorMsg} `;
+            setRoutingError(`${combined}Falling back to OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.`);
           } else {
             setRoutingError('Using OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.');
           }
@@ -900,8 +908,11 @@ export default function App() {
       // 4. Simulation mode fallback route data with dynamic interpolation
       const mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
       setIsSimulationMode(true);
-      if (googleMapsErrorMsg) {
-        setRoutingError(`Google Directions API failed (${googleMapsErrorMsg}). All backup routing APIs are offline. Simulation mode active.`);
+      if (googleMapsErrorMsg || mapboxErrorMsg) {
+        let combined = '';
+        if (googleMapsErrorMsg) combined += `Google: ${googleMapsErrorMsg} `;
+        if (mapboxErrorMsg) combined += `Mapbox: ${mapboxErrorMsg} `;
+        setRoutingError(`${combined}All backup routing APIs are offline. Simulation mode active.`);
       } else {
         setRoutingError('All routing APIs offline. Simulation mode active.');
       }
