@@ -669,17 +669,6 @@ export default function App() {
               });
             }
           }
-
-          // Absolute fallback if OSRM also failed to yield enough alternative routes
-          if (finalRoutes.length < 3) {
-            const mockAlternatives = generateDynamicMockRoutes(start, end, travelMode);
-            if (finalRoutes.length === 1) {
-              finalRoutes.push({ ...mockAlternatives[1], isRecommended: false });
-              finalRoutes.push({ ...mockAlternatives[2], isRecommended: false });
-            } else if (finalRoutes.length === 2) {
-              finalRoutes.push({ ...mockAlternatives[2], isRecommended: false });
-            }
-          }
         }
         return finalRoutes;
       };

@@ -890,6 +890,18 @@ export default function Sidebar({
                       </div>
                     );
                   })}
+
+                  {routeOptions.length === 1 && (
+                    <div style={styles.noAlternativesText}>
+                      ℹ️ No other alternative routes available.
+                    </div>
+                  )}
+
+                  {routeOptions.length === 0 && (
+                    <div style={styles.noAlternativesText}>
+                      ⚠️ No possible routes found for this trip.
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -1350,5 +1362,16 @@ const styles = {
     fontWeight: '700',
     lineHeight: 1,
     transition: 'var(--transition-fast)',
+  },
+  noAlternativesText: {
+    fontSize: '0.72rem',
+    color: 'var(--text-muted)',
+    textAlign: 'center',
+    padding: '12px 10px',
+    border: '1px dashed rgba(255, 255, 255, 0.1)',
+    borderRadius: '8px',
+    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    marginTop: '10px',
+    lineHeight: '1.4',
   },
 };
