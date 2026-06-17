@@ -149,7 +149,6 @@ export default function LandingPage({ onNavigate }) {
                   <svg style={styles.mapSvg} viewBox="0 0 400 300">
                     {/* Background paths */}
                     <path d="M 50 150 Q 150 100 200 150 T 350 150" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" strokeLinecap="round" />
-                    <path d="M 100 50 L 300 250" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="6" strokeLinecap="round" />
 
                     {/* Calculated Routes */}
                     <path d="M 50 150 Q 150 100 200 150 T 350 150" fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" className="pulse" style={{ opacity: 0.6 }} />
