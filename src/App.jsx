@@ -677,7 +677,7 @@ export default function App() {
           if (travelMode === 'walk') mapboxProfile = 'mapbox/walking';
 
           const response = await fetch(
-            `https://api.mapbox.com/directions/v5/${mapboxProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&alternatives=true&access_token=${settings.mapboxKey}`
+            `https://api.mapbox.com/directions/v5/${mapboxProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&overview=full&alternatives=true&access_token=${settings.mapboxKey}`
           );
           const data = await response.json();
           if (!response.ok) {
