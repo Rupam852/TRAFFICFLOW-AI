@@ -111,6 +111,25 @@ export default function Auth({ onAuthSuccess }) {
             {isSignUp ? 'Get started with TrafficFlow AI today' : 'Sign in to access your saved bookmarks and maps'}
           </p>
 
+          <div style={{
+            background: 'rgba(245, 158, 11, 0.1)',
+            border: '1px solid rgba(245, 158, 11, 0.25)',
+            borderRadius: '10px',
+            padding: '12px',
+            marginBottom: '20px',
+            fontSize: '0.78rem',
+            color: '#fbbf24',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '8px',
+            lineHeight: '1.4'
+          }}>
+            <span style={{ fontSize: '1.1rem', flexShrink: 0, marginTop: '-2px' }}>⚠️</span>
+            <div>
+              <strong>API Keys Required:</strong> Keyless simulation is disabled. You must configure your own Google Maps and Mapbox keys in the app settings to render maps and compute routes.
+            </div>
+          </div>
+
           {message.text && (
             <div style={{
               ...styles.messageBanner,

@@ -187,7 +187,6 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareEtaOpen, setIsShareEtaOpen] = useState(false);
   const [showWarningOnLogin, setShowWarningOnLogin] = useState(false);
-  const [showApiSetupGuide, setShowApiSetupGuide] = useState(false);
 
   // Sync Supabase Auth session
   useEffect(() => {
@@ -406,11 +405,6 @@ export default function App() {
     if (!hasSeenWarning) {
       setShowWarningOnLogin(true);
       localStorage.setItem('tf_seen_warning', 'true');
-    }
-    // Show API key setup guide if not yet seen
-    const hasSeenSetup = localStorage.getItem('tf_seen_setup');
-    if (!hasSeenSetup) {
-      setShowApiSetupGuide(true);
     }
   };
 
@@ -1238,15 +1232,15 @@ export default function App() {
         </div>
       )}
 
-      {/* API Key Setup Guide — shown to new users after first login */}
-      {showApiSetupGuide && !showWarningOnLogin && (
-        <div style={styles.disclaimerBackdrop}>
+      {/* API Key Setup Guide — shown to new users and locks the app if keys are missing */}
+      {(!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && (
+        <div style={{ ...styles.disclaimerBackdrop, backdropFilter: 'blur(16px)', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}>
           <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0' }}>
             <div style={{ textAlign: 'center', marginBottom: '16px' }}>
               <span style={{ fontSize: '2.5rem' }}>🔑</span>
-              <h3 style={{ ...styles.disclaimerTitle, marginTop: '8px' }}>Setup Your API Keys</h3>
-              <p style={{ ...styles.disclaimerText, marginTop: '4px' }}>
-                TrafficFlow AI needs API keys to show maps, calculate routes, and enable AI. Without them, features will be limited.
+              <h3 style={{ ...styles.disclaimerTitle, marginTop: '8px' }}>Mandatory API Key Configuration</h3>
+              <p style={{ ...styles.disclaimerText, marginTop: '6px' }}>
+                TrafficFlow AI requires your own API credentials. Keyless simulation mode and public map fallbacks are disabled. You must configure them to proceed.
               </p>
             </div>
             <div style={styles.setupKeysList}>
@@ -1254,14 +1248,21 @@ export default function App() {
                 <span style={styles.setupKeyIcon}>🗺️</span>
                 <div>
                   <div style={styles.setupKeyName}>Google Maps API Key <span style={styles.setupKeyRequired}>Required</span></div>
-                  <div style={styles.setupKeyDesc}>Shows the live map, calculates real routes and directions</div>
+                  <div style={styles.setupKeyDesc}>Used for loading the interactive maps and geocoding places</div>
+                </div>
+              </div>
+              <div style={styles.setupKeyRow}>
+                <span style={styles.setupKeyIcon}>📍</span>
+                <div>
+                  <div style={styles.setupKeyName}>Mapbox Access Token <span style={styles.setupKeyRequired}>Required</span></div>
+                  <div style={styles.setupKeyDesc}>Used for calculating real-time routes, directions and road geometry</div>
                 </div>
               </div>
               <div style={styles.setupKeyRow}>
                 <span style={styles.setupKeyIcon}>🤖</span>
                 <div>
-                  <div style={styles.setupKeyName}>Gemini / OpenAI Key <span style={styles.setupKeyOptional}>Recommended</span></div>
-                  <div style={styles.setupKeyDesc}>Powers the AI traffic analyst and smart suggestions</div>
+                  <div style={styles.setupKeyName}>Gemini / OpenAI Key <span style={styles.setupKeyOptional}>Optional</span></div>
+                  <div style={styles.setupKeyDesc}>Powers the AI traffic analyst and smart route summaries</div>
                 </div>
               </div>
               <div style={styles.setupKeyRow}>
@@ -1271,33 +1272,16 @@ export default function App() {
                   <div style={styles.setupKeyDesc}>Enables live weather sync and automatic day/night mode</div>
                 </div>
               </div>
-              <div style={styles.setupKeyRow}>
-                <span style={styles.setupKeyIcon}>📍</span>
-                <div>
-                  <div style={styles.setupKeyName}>Mapbox Key <span style={styles.setupKeyOptional}>Optional</span></div>
-                  <div style={styles.setupKeyDesc}>Backup routing when Google Maps is unavailable</div>
-                </div>
-              </div>
             </div>
-            <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '24px', justifyContent: 'center', width: '100%' }}>
               <button
                 className="glow-btn"
+                style={{ width: '100%', padding: '12px', fontSize: '0.95rem' }}
                 onClick={() => {
-                  localStorage.setItem('tf_seen_setup', 'true');
-                  setShowApiSetupGuide(false);
                   setIsSettingsOpen(true);
                 }}
               >
-                ⚙️ Open Settings
-              </button>
-              <button
-                style={styles.skipBtn}
-                onClick={() => {
-                  localStorage.setItem('tf_seen_setup', 'true');
-                  setShowApiSetupGuide(false);
-                }}
-              >
-                Skip for now
+                ⚙️ Setup API Keys in Settings
               </button>
             </div>
           </div>
