@@ -1370,6 +1370,8 @@ export default function App() {
             const durationMinutes = adjustedDuration / 60;  // store raw minutes for accurate traffic adjustment
             const durationMin = fmtDur(durationMinutes);
             
+            console.log(`[OSRM Route ${index}] Raw: distance=${r.distance}m (${distKmNum.toFixed(2)}km), duration=${r.duration}s (${durationMinutes.toFixed(1)}min) → Display: "${distanceKm}", "${durationMin}"`);
+            
             let traffic = 'smooth';
             let delay = null;
             if (index === 1) {
@@ -1608,13 +1610,18 @@ export default function App() {
         return prev.map((route, idx) => {
           if (idx !== selectedRouteIndex) return route;
 
-          // Parse base distance (e.g. "12.4 km")
+          // Use the real base duration preserved from OSRM/Mapbox.
+          // Fall back to modeSpeed estimate only if durationMinutes is missing (pure mock routes).
           const distKm = parseFloat(route.distance.replace(/[^\d.]/g, ''));
-          if (isNaN(distKm)) return route;
+          const baseMins = route.durationMinutes && !isNaN(route.durationMinutes)
+            ? route.durationMinutes
+            : (!isNaN(distKm) ? (distKm / (modeSpeed[travelMode] || 50)) * 60 : null);
 
-          // Recalculate duration using traffic factor
-          const baseSpeed = modeSpeed[travelMode] || 50;
-          const newMins = (distKm / baseSpeed) * 60 * factor;
+          let newDuration = route.duration; // keep existing if no base available
+          if (baseMins !== null) {
+            const newMins = baseMins * factor;
+            newDuration = fmtDur(newMins);
+          }
 
           // Reactively update segment statuses so they are colored on the map
           let updatedSegments = route.trafficSegments || [];
@@ -1634,7 +1641,7 @@ export default function App() {
             ...route,
             trafficStatus: status,
             delayInfo: delayInfo,
-            duration: fmtDur(newMins),
+            duration: newDuration,
             trafficSegments: updatedSegments
           };
         });
