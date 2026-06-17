@@ -478,7 +478,7 @@ export default function Sidebar({
       </div>
 
       {/* Tab Panel Contents */}
-      <div style={styles.panelContent}>
+      <div style={styles.panelContent} className="panel-content-scroll">
         {activeTab === 'nav' ? (
           <div style={styles.navPanel}>
             {routingError && (
