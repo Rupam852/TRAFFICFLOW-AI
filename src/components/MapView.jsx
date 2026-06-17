@@ -93,6 +93,7 @@ export default function MapView({
   routingError,
   isRoutesLoading,
   isRouteSwitching,
+  isRouteSimulationActive,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -429,6 +430,18 @@ export default function MapView({
       mapRef.current.panTo(latlng);
     }
   }, [navMarkerPos, navMarkerBearing, mapLoaded, autoFollow]);
+
+  // Handle automatic follow reset when route simulation starts
+  useEffect(() => {
+    if (isRouteSimulationActive) {
+      setAutoFollow(true);
+      if (mapRef.current && navMarkerPos) {
+        const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
+        mapRef.current.setZoom(16);
+        mapRef.current.panTo(latlng);
+      }
+    }
+  }, [isRouteSimulationActive]);
 
   // Handle active amenity searches around map center
   useEffect(() => {

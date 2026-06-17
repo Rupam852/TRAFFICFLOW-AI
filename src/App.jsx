@@ -177,6 +177,21 @@ export default function App() {
   const [showArrivalToast, setShowArrivalToast] = useState(false); // controls arrival toast visibility
   const lastSearchedDestNameRef = useRef(null);
 
+  // Refs and states for route navigation simulation
+  const [isRouteSimulationActive, setIsRouteSimulationActive] = useState(false);
+  const isRouteSimulationActiveRef = useRef(false);
+  const navMarkerPosRef = useRef(null);
+  const simulationIntervalRef = useRef(null);
+
+  // Keep refs synchronized to prevent stale closures in watchPosition and fetchEffects
+  useEffect(() => {
+    isRouteSimulationActiveRef.current = isRouteSimulationActive;
+  }, [isRouteSimulationActive]);
+
+  useEffect(() => {
+    navMarkerPosRef.current = navMarkerPos;
+  }, [navMarkerPos]);
+
   // Bookmarks & Search History States
   const [bookmarks, setBookmarks] = useState(() => {
     const saved = localStorage.getItem('tf_bookmarks');
@@ -404,28 +419,14 @@ export default function App() {
 
     const watchId = navigator.geolocation.watchPosition(
       (pos) => {
+        // If simulation is running, ignore physical GPS updates
+        if (isRouteSimulationActiveRef.current) return;
+
         const { longitude, latitude, heading } = pos.coords;
         setNavMarkerPos([longitude, latitude]);
         if (heading !== null && heading !== undefined) {
           setNavMarkerBearing(heading);
         }
-
-        // Arrival detection: within 300 m of destination
-        setDestination(prevDest => {
-          if (prevDest?.coordinates) {
-            const dist = haversineMetres([longitude, latitude], prevDest.coordinates);
-            if (dist <= 300) {
-              setHasArrived(prev => {
-                if (!prev) {
-                  setShowArrivalToast(true);
-                  setTimeout(() => setShowArrivalToast(false), 7000);
-                }
-                return true;
-              });
-            }
-          }
-          return prevDest;
-        });
       },
       (err) => console.warn('GPS watch error:', err),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
@@ -433,6 +434,27 @@ export default function App() {
 
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
+
+  // Arrival detection effect: runs whenever navMarkerPos or destination changes
+  useEffect(() => {
+    if (navMarkerPos && destination?.coordinates) {
+      const dist = haversineMetres(navMarkerPos, destination.coordinates);
+      if (dist <= 300) {
+        setHasArrived(prev => {
+          if (!prev) {
+            setShowArrivalToast(true);
+            // Auto dismiss toast after 7 seconds
+            setTimeout(() => setShowArrivalToast(false), 7000);
+            return true;
+          }
+          return prev;
+        });
+      } else {
+        // Reset hasArrived status when moving away (or when selecting a new route)
+        setHasArrived(false);
+      }
+    }
+  }, [navMarkerPos, destination]);
 
   const handleAuthSuccess = (authUser) => {
     setUser(authUser);
@@ -569,20 +591,19 @@ export default function App() {
         let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
       let mapboxErrorMsg = null;
 
-      // If start is "My Current Location", fetch fresh GPS coordinates first
+      // If start is "My Current Location", use the latest tracked GPS coordinates if available
       if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
-        try {
-          const freshPos = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
-          });
-          start = [freshPos.coords.longitude, freshPos.coords.latitude];
-          // Update startLocation state with the fresh coordinates so start marker snaps to user
-          setStartLocation(prev => ({
-            ...prev,
-            coordinates: start
-          }));
-        } catch (err) {
-          console.warn('Could not fetch fresh GPS coordinates for routing:', err);
+        if (navMarkerPosRef.current) {
+          start = navMarkerPosRef.current;
+        } else {
+          try {
+            const freshPos = await new Promise((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
+            });
+            start = [freshPos.coords.longitude, freshPos.coords.latitude];
+          } catch (err) {
+            console.warn('Could not fetch fresh GPS coordinates for routing:', err);
+          }
         }
       }
 
@@ -1112,6 +1133,7 @@ export default function App() {
   };
 
   const handleSelectBookmark = (bm) => {
+    stopRouteSimulation();
     setDestination({ name: bm.address, coordinates: bm.coordinates });
     if (window.innerWidth <= 640) {
       setIsSidebarOpen(false);
@@ -1142,6 +1164,7 @@ export default function App() {
 
   // Search History Action
   const handleSelectHistory = (item) => {
+    stopRouteSimulation();
     setDestination({ name: item.name, coordinates: item.coordinates });
     if (window.innerWidth <= 640) {
       setIsSidebarOpen(false);
@@ -1203,11 +1226,79 @@ export default function App() {
     setPois(mockPOIs[type] || []);
   };
 
+  const calculateBearing = (start, end) => {
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const toDeg = (rad) => (rad * 180) / Math.PI;
+
+    const lat1 = toRad(start[1]);
+    const lat2 = toRad(end[1]);
+    const dLng = toRad(end[0] - start[0]);
+
+    const y = Math.sin(dLng) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+    const brng = toDeg(Math.atan2(y, x));
+    return (brng + 360) % 360;
+  };
+
+  const startRouteSimulation = () => {
+    const route = routeOptions[selectedRouteIndex];
+    if (!route || !route.geometry || route.geometry.length < 2) return;
+
+    stopRouteSimulation();
+
+    setIsRouteSimulationActive(true);
+    setHasArrived(false);
+    setShowArrivalToast(false);
+
+    let currentIndex = 0;
+    const geometry = route.geometry;
+
+    // Set starting position
+    setNavMarkerPos(geometry[0]);
+    if (geometry.length > 1) {
+      setNavMarkerBearing(calculateBearing(geometry[0], geometry[1]));
+    }
+
+    simulationIntervalRef.current = setInterval(() => {
+      currentIndex++;
+      if (currentIndex >= geometry.length) {
+        stopRouteSimulation();
+        return;
+      }
+
+      const prevPt = geometry[currentIndex - 1];
+      const currPt = geometry[currentIndex];
+
+      const bearing = calculateBearing(prevPt, currPt);
+      setNavMarkerBearing(bearing);
+      setNavMarkerPos(currPt);
+    }, 850);
+  };
+
+  const stopRouteSimulation = () => {
+    if (simulationIntervalRef.current) {
+      clearInterval(simulationIntervalRef.current);
+      simulationIntervalRef.current = null;
+    }
+    setIsRouteSimulationActive(false);
+  };
+
+  // Cleanup simulation timer on unmount
+  useEffect(() => {
+    return () => {
+      if (simulationIntervalRef.current) {
+        clearInterval(simulationIntervalRef.current);
+      }
+    };
+  }, []);
+
   const handlePoiClick = (poi) => {
+    stopRouteSimulation();
     setDestination({ name: poi.name, coordinates: poi.coordinates });
   };
 
   const handleRouteSelected = (idx) => {
+    stopRouteSimulation();
     if (idx === selectedRouteIndex) return;
     setIsRouteSwitching(true);
     setSelectedRouteIndex(idx);
@@ -1429,6 +1520,9 @@ export default function App() {
         onTravelModeChange={setTravelMode}
         isSimulationMode={isSimulationMode}
         routingError={routingError}
+        isRouteSimulationActive={isRouteSimulationActive}
+        onStartSimulation={startRouteSimulation}
+        onStopSimulation={stopRouteSimulation}
       />
 
       <MapView
@@ -1460,6 +1554,7 @@ export default function App() {
         onAmenitiesSearchFallback={handleAmenitiesSearchFallback}
         activeRoutingEngine={activeRoutingEngine}
         routingError={routingError}
+        isRouteSimulationActive={isRouteSimulationActive}
       />
 
     </div>
