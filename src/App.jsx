@@ -1306,7 +1306,7 @@ export default function App() {
   }
 
   return (
-    <div style={styles.appContainer}>
+    <div className="app-container">
       
       {/* Settings Dialog Modal */}
       <SettingsModal
@@ -1567,14 +1567,6 @@ export default function App() {
 }
 
 const styles = {
-  appContainer: {
-    display: 'flex',
-    width: '100vw',
-    height: '100vh',
-    overflow: 'hidden',
-    position: 'relative',
-    backgroundColor: 'var(--bg-primary)',
-  },
   mapPlaceholderContainer: {
     flex: 1,
     height: '100%',

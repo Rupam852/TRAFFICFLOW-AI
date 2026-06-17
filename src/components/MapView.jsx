@@ -156,6 +156,8 @@ export default function MapView({
           renderingType: 'VECTOR', // Enable WebGL Vector maps for rotation & tilt
           tilt: 0,
           heading: 0,
+          mapId: 'DEMO_MAP_ID', // Enable vector features like rotation and tilt on mobile
+          gestureHandling: 'greedy', // Enable single-finger panning on mobile
         });
 
         // Collapse sidebar on map click
@@ -782,7 +784,7 @@ export default function MapView({
               mapRef.current.setZoom(16);
             }
           }}
-          className="glass-panel glow-btn"
+          className="glass-panel glow-btn recenter-btn-responsive"
           style={styles.recenterBtn}
         >
           🎯 Recenter Map
@@ -792,7 +794,7 @@ export default function MapView({
       {/* Floating Routing Engine Status Indicator */}
       {destination && (
         <div
-          className="glass-panel"
+          className="glass-panel routing-status-responsive"
           style={styles.routingStatusBanner}
         >
           <div style={styles.statusRow}>

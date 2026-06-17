@@ -882,3 +882,54 @@ h1, h2, h3, h4, h5, h6 {
   }
 }
 
+/* App workspace container class with dynamic viewport height support */
+.app-container {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--bg-primary);
+}
+
+/* Responsive map control overlays */
+.recenter-btn-responsive {
+  /* Default positioning is style-based (top-right) */
+  transition: var(--transition-smooth);
+}
+
+.routing-status-responsive {
+  /* Default positioning is style-based (top-center) */
+  transition: var(--transition-smooth);
+}
+
+/* Mobile overrides for map controls and HUD elements */
+@media (max-width: 640px) {
+  .recenter-btn-responsive {
+    position: absolute !important;
+    top: auto !important;
+    left: auto !important;
+    right: 16px !important;
+    /* Positioned perfectly above the bottom climate widget */
+    bottom: calc(170px + env(safe-area-inset-bottom)) !important;
+    padding: 8px 14px !important;
+    font-size: 0.75rem !important;
+    border-radius: 8px !important;
+    z-index: 1000 !important;
+  }
+
+  .routing-status-responsive {
+    position: absolute !important;
+    top: 16px !important;
+    left: auto !important;
+    right: 16px !important;
+    transform: none !important;
+    padding: 8px 12px !important;
+    border-radius: 8px !important;
+    font-size: 0.75rem !important;
+    max-width: calc(100% - 90px) !important; /* leaves room for hamburger menu on the left */
+    z-index: 1000 !important;
+  }
+}
+
