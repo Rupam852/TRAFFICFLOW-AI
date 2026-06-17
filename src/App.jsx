@@ -945,74 +945,41 @@ export default function App() {
       // 1. Try TomTom Live Traffic Flow segments if key is set
       if (settings.tomtomKey) {
         try {
-          // Sample 3 points along the route
-          const idxs = [
-            Math.floor(geom.length * 0.15),
-            Math.floor(geom.length * 0.5),
-            Math.floor(geom.length * 0.85)
-          ];
-          
-          let totalRatio = 0;
-          let validPointsCount = 0;
-          let totalDelaySec = 0;
+          // Sample only the midpoint of the route (1 API call instead of 3)
+          const midIdx = Math.floor(geom.length * 0.5);
+          const pt = geom[midIdx];
 
-          await Promise.all(
-            idxs.map(async (i) => {
-              const pt = geom[i];
-              if (!pt) return;
-              try {
-                // TomTom Traffic Flow segments API (lat,lng so pt[1],pt[0])
-                const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative-to-functional/10/json?key=${settings.tomtomKey}&point=${pt[1]},${pt[0]}`;
-                const res = await fetchWithTimeout(url, { timeout: 3500 });
-                if (res.ok) {
-                  const data = await res.json();
-                  if (data.flowSegmentData) {
-                    const current = data.flowSegmentData.currentSpeed;
-                    const freeFlow = data.flowSegmentData.freeFlowSpeed;
-                    if (freeFlow > 0) {
-                      totalRatio += current / freeFlow;
-                      validPointsCount++;
-                    }
-                    const travelTime = data.flowSegmentData.currentTravelTime;
-                    const freeFlowTime = data.flowSegmentData.freeFlowTravelTime;
-                    if (travelTime > freeFlowTime) {
-                      totalDelaySec += (travelTime - freeFlowTime);
-                    }
+          if (pt) {
+            const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative-to-functional/10/json?key=${settings.tomtomKey}&point=${pt[1]},${pt[0]}`;
+            const res = await fetchWithTimeout(url, { timeout: 3500 });
+            if (res.ok) {
+              const data = await res.json();
+              if (data.flowSegmentData) {
+                const current = data.flowSegmentData.currentSpeed;
+                const freeFlow = data.flowSegmentData.freeFlowSpeed;
+                const travelTime = data.flowSegmentData.currentTravelTime;
+                const freeFlowTime = data.flowSegmentData.freeFlowTravelTime;
+                const delaySec = Math.max(0, (travelTime || 0) - (freeFlowTime || 0));
+
+                if (freeFlow > 0) {
+                  const ratio = current / freeFlow;
+                  if (ratio >= 0.85) {
+                    newStatus = 'smooth'; trafficFactor = 1.0;
+                  } else if (ratio >= 0.55) {
+                    newStatus = 'moderate'; trafficFactor = 1.25;
+                    newDelayInfo = delaySec > 0 ? `${Math.round(delaySec / 60)} min traffic delay` : 'Moderate traffic congestion';
+                  } else if (ratio >= 0.25) {
+                    newStatus = 'heavy'; trafficFactor = 1.6;
+                    newDelayInfo = delaySec > 0 ? `Heavy delay: +${Math.round(delaySec / 60)} min` : 'Heavy traffic congestion';
+                  } else {
+                    newStatus = 'blocked'; trafficFactor = 2.5;
+                    newDelayInfo = 'Road highly congested or blocked';
                   }
+                  updateRouteWithTraffic(newStatus, newDelayInfo, trafficFactor);
+                  return;
                 }
-              } catch (e) {
-                console.warn('Failed to fetch TomTom traffic flow point:', e);
               }
-            })
-          );
-
-          if (validPointsCount > 0) {
-            const avgRatio = totalRatio / validPointsCount;
-            // Map to traffic status
-            if (avgRatio >= 0.85) {
-              newStatus = 'smooth';
-              trafficFactor = 1.0;
-            } else if (avgRatio >= 0.55) {
-              newStatus = 'moderate';
-              trafficFactor = 1.25;
-              newDelayInfo = totalDelaySec > 0 
-                ? `${Math.round(totalDelaySec / 60)} min traffic delay`
-                : 'Moderate traffic congestion';
-            } else if (avgRatio >= 0.25) {
-              newStatus = 'heavy';
-              trafficFactor = 1.6;
-              newDelayInfo = totalDelaySec > 0 
-                ? `Heavy delay: +${Math.round(totalDelaySec / 60)} min`
-                : 'Heavy traffic congestion';
-            } else {
-              newStatus = 'blocked';
-              trafficFactor = 2.5;
-              newDelayInfo = 'Road highly congested or blocked';
             }
-
-            // Successfully fetched traffic
-            updateRouteWithTraffic(newStatus, newDelayInfo, trafficFactor);
-            return;
           }
         } catch (e) {
           console.warn('TomTom live traffic routing failed, using fallback simulation:', e);
@@ -1044,7 +1011,7 @@ export default function App() {
 
       updateRouteWithTraffic(newStatus, newDelayInfo, trafficFactor);
 
-    }, 15000); // run every 15 seconds
+    }, 60000); // run every 60 seconds (reduced from 15s to cut API token usage by 75%)
 
     // Helper to update state reactively
     const updateRouteWithTraffic = (status, delayInfo, factor) => {

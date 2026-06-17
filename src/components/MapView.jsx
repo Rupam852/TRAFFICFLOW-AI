@@ -200,11 +200,11 @@ export default function MapView({
     if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
     const map = mapRef.current;
 
-    // Reset fitted bounds flag if the destination/route/selected index has changed
-    const routeKey = `${destination?.coordinates?.join(',')}_${selectedRouteIndex}_${routeOptions?.length}`;
-    if (routeKey !== lastRouteKeyRef.current) {
-      hasFittedBoundsRef.current = false;
-      lastRouteKeyRef.current = routeKey;
+    // Track if destination or route index changed (not traffic data) — only fit bounds on real changes
+    const fitKey = `${destination?.coordinates?.join(',')}_${selectedRouteIndex}`;
+    const shouldFitBounds = fitKey !== lastRouteKeyRef.current;
+    if (shouldFitBounds) {
+      lastRouteKeyRef.current = fitKey;
     }
 
     // Clear old markers
@@ -371,12 +371,14 @@ export default function MapView({
       });
       polylinesRef.current.push(poly);
 
-      // Fit map bounds to show the full selected route
-      const bounds = new window.google.maps.LatLngBounds();
-      pathCoords.forEach(pt => bounds.extend(pt));
-      if (startLatLng) bounds.extend(startLatLng);
-      if (endLatLng) bounds.extend(endLatLng);
-      map.fitBounds(bounds, { top: 80, right: 40, bottom: 80, left: 40 });
+      // Fit map bounds ONLY when destination or route index genuinely changed
+      if (shouldFitBounds) {
+        const bounds = new window.google.maps.LatLngBounds();
+        pathCoords.forEach(pt => bounds.extend(pt));
+        if (startLatLng) bounds.extend(startLatLng);
+        if (endLatLng) bounds.extend(endLatLng);
+        map.fitBounds(bounds, { top: 80, right: 40, bottom: 80, left: 40 });
+      }
     }
 
   }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois]);
