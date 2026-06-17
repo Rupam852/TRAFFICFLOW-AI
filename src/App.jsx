@@ -195,10 +195,7 @@ export default function App() {
 
 
 
-  const [searchHistory, setSearchHistory] = useState([
-    { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
-    { name: 'India Gate, Delhi', coordinates: [77.2295, 28.6129] },
-  ]);
+  const [searchHistory, setSearchHistory] = useState([]);
 
   // Modal Toggles
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -225,10 +222,7 @@ export default function App() {
     setDismissedKeySetup(false);
     if (!user) {
       setTimeout(() => {
-        setSearchHistory([
-          { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
-          { name: 'India Gate, Delhi', coordinates: [77.2295, 28.6129] },
-        ]);
+        setSearchHistory([]);
         setSettings({
           theme: localStorage.getItem('tf_theme') || 'dark',
           googleMapsKey: '',
@@ -308,6 +302,8 @@ export default function App() {
             coordinates: Array.isArray(h.coordinates) ? h.coordinates : JSON.parse(h.coordinates)
           }));
           setSearchHistory(parsedHistory);
+        } else {
+          setSearchHistory([]);
         }
       } catch (err) {
         console.error('Failed to sync data with Supabase:', err);
