@@ -156,6 +156,7 @@ export default function App() {
   const [mapCenter, setMapCenter] = useState([77.2090, 28.6139]);
   const [activeAmenitySearch, setActiveAmenitySearch] = useState(null);
   const [isSimulationMode, setIsSimulationMode] = useState(false);
+  const [routingError, setRoutingError] = useState(null);
 
   // Weather & Time States
   const [weather, setWeather] = useState(localStorage.getItem('tf_weather') || 'clear');
@@ -524,6 +525,7 @@ export default function App() {
 
     const fetchRoutes = async () => {
       let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
+      let googleMapsErrorMsg = null;
 
       // If start is "My Current Location", fetch fresh GPS coordinates first
       if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
@@ -742,12 +744,18 @@ export default function App() {
             const finalRoutes = await supplementWithRealRoads(routesParsed);
 
             setIsSimulationMode(false);
+            setRoutingError(null);
             setRouteOptions(finalRoutes);
             setSelectedRouteIndex(0);
             return;
           }
         } catch (error) {
           console.warn('Google Maps Directions Service failed, trying Mapbox API:', error);
+          if (error.message && error.message.includes('REQUEST_DENIED')) {
+            googleMapsErrorMsg = 'Directions API is not enabled in your Google Cloud Console for this API key.';
+          } else {
+            googleMapsErrorMsg = error.message || 'Unknown error';
+          }
         }
       }
 
@@ -799,6 +807,11 @@ export default function App() {
             const finalRoutes = await supplementWithRealRoads(routesParsed);
 
             setIsSimulationMode(false);
+            if (googleMapsErrorMsg) {
+              setRoutingError(`Google Directions API failed (${googleMapsErrorMsg}). Falling back to Mapbox API.`);
+            } else {
+              setRoutingError(null);
+            }
             setRouteOptions(finalRoutes);
             setSelectedRouteIndex(0);
             return;
@@ -871,6 +884,11 @@ export default function App() {
           const finalRoutes = await supplementWithRealRoads(routesParsed);
 
           setIsSimulationMode(false);
+          if (googleMapsErrorMsg) {
+            setRoutingError(`Google Directions API failed (${googleMapsErrorMsg}). Falling back to OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.`);
+          } else {
+            setRoutingError('Using OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.');
+          }
           setRouteOptions(finalRoutes);
           setSelectedRouteIndex(0);
           return;
@@ -882,6 +900,11 @@ export default function App() {
       // 4. Simulation mode fallback route data with dynamic interpolation
       const mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
       setIsSimulationMode(true);
+      if (googleMapsErrorMsg) {
+        setRoutingError(`Google Directions API failed (${googleMapsErrorMsg}). All backup routing APIs are offline. Simulation mode active.`);
+      } else {
+        setRoutingError('All routing APIs offline. Simulation mode active.');
+      }
       setRouteOptions(mockRoutes);
       setSelectedRouteIndex(0);
     };
@@ -1402,6 +1425,7 @@ export default function App() {
         travelMode={travelMode}
         onTravelModeChange={setTravelMode}
         isSimulationMode={isSimulationMode}
+        routingError={routingError}
       />
 
       <MapView

@@ -28,7 +28,8 @@ export default function Sidebar({
   onShareEta,
   travelMode,
   onTravelModeChange,
-  isSimulationMode
+  isSimulationMode,
+  routingError
 }) {
   const [activeTab, setActiveTab] = useState('nav'); // 'nav' or 'ai'
   const [startInput, setStartInput] = useState(startLocation?.name || '');
@@ -530,21 +531,31 @@ export default function Sidebar({
       <div style={styles.panelContent}>
         {activeTab === 'nav' ? (
           <div style={styles.navPanel}>
-            {isSimulationMode && (
+            {routingError && (
               <div style={{
-                background: 'rgba(239, 68, 68, 0.12)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
+                background: isSimulationMode ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                border: isSimulationMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
                 borderRadius: '8px',
-                padding: '10px 14px',
+                padding: '12px 14px',
                 fontSize: '0.78rem',
-                color: '#f87171',
+                color: isSimulationMode ? '#f87171' : '#fbbf24',
                 marginBottom: '16px',
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: 'flex-start',
                 lineHeight: '1.4'
               }}>
-                <span style={{ marginRight: '8px', fontSize: '1rem' }}>⚠️</span>
-                <span><strong>Simulation Mode:</strong> Routing APIs offline. Path is direct.</span>
+                <span style={{ marginRight: '8px', fontSize: '1.1rem', marginTop: '1px', flexShrink: 0 }}>⚠️</span>
+                <div>
+                  <strong>{isSimulationMode ? 'Simulation Mode Active' : 'Routing API Status Warning'}</strong>
+                  <div style={{ marginTop: '4px', fontSize: '0.74rem', opacity: 0.9 }}>
+                    {routingError}
+                  </div>
+                  {routingError.includes('Console') && (
+                    <div style={{ marginTop: '6px', fontSize: '0.72rem', fontWeight: '700', textDecoration: 'underline' }}>
+                      To fix: Enable the "Directions API" in Google Cloud Console.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             
