@@ -200,6 +200,56 @@ export default function LandingPage({ onNavigate }) {
         </div>
       </section>
 
+      {/* Platform Limitations */}
+      <section id="limitations" style={{ ...styles.section, borderTop: '1px solid var(--border-color)' }}>
+        <div style={styles.sectionHeader}>
+          <h2 style={styles.sectionTitle}>System Constraints &amp; Limitations</h2>
+          <p style={styles.sectionDesc}>To ensure transparent operation, please review the current constraints of our smart navigation engine.</p>
+        </div>
+
+        <div className="landing-limitations-grid">
+          <div className="glass-panel" style={styles.limitationCard}>
+            <div style={styles.limitationHeader}>
+              <span style={{ fontSize: '1.25rem' }}>🔑</span>
+              <h3 style={styles.limitationTitle}>Mandatory Custom API Credentials</h3>
+            </div>
+            <p style={styles.limitationText}>
+              Direct integration with Google Maps and Mapbox is required to load map views and draw route geometries. Public keys are disabled to avoid service throttling.
+            </p>
+          </div>
+
+          <div className="glass-panel" style={styles.limitationCard}>
+            <div style={styles.limitationHeader}>
+              <span style={{ fontSize: '1.25rem' }}>⚡</span>
+              <h3 style={styles.limitationTitle}>Third-Party Rate Limits</h3>
+            </div>
+            <p style={styles.limitationText}>
+              Geocoding place queries, elevation checks, and traffic heatmaps are bound to the query rates and quotas of your personal developer plans.
+            </p>
+          </div>
+
+          <div className="glass-panel" style={styles.limitationCard}>
+            <div style={styles.limitationHeader}>
+              <span style={{ fontSize: '1.25rem' }}>🤖</span>
+              <h3 style={styles.limitationTitle}>Model-Dependent AI Insights</h3>
+            </div>
+            <p style={styles.limitationText}>
+              AI route summaries and delay explanations depend on external LLM availability (Gemini, Claude, OpenAI). Answers may be subject to API key usage ceilings.
+            </p>
+          </div>
+
+          <div className="glass-panel" style={styles.limitationCard}>
+            <div style={styles.limitationHeader}>
+              <span style={{ fontSize: '1.25rem' }}>🌦️</span>
+              <h3 style={styles.limitationTitle}>Simulated Environment Layers</h3>
+            </div>
+            <p style={styles.limitationText}>
+              Weather impacts (rain speeds, fog visibility, time-of-day offsets) are computed via local canvas simulation overlay and mapped estimate parameters.
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* FAQs */}
       <section id="faqs" style={styles.section}>
         <div style={styles.sectionHeader}>
@@ -725,5 +775,30 @@ const styles = {
     textAlign: 'center',
     fontSize: '0.78rem',
     color: '#475569',
-  }
+  },
+  limitationCard: {
+    padding: '28px',
+    borderRadius: '16px',
+    border: '1px solid rgba(255,255,255,0.05)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    background: 'rgba(255, 255, 255, 0.005)',
+    transition: 'all 0.3s ease',
+  },
+  limitationHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  limitationTitle: {
+    fontSize: '1.05rem',
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  limitationText: {
+    fontSize: '0.85rem',
+    color: '#94a3b8',
+    lineHeight: '1.55',
+  },
 };

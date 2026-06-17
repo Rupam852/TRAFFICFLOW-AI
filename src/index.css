@@ -1096,6 +1096,25 @@ h1, h2, h3, h4, h5, h6 {
 .privacy-modal-scroll {
   overflow-y: auto;
   padding-right: 8px;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE */
+}
+
+.privacy-modal-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.privacy-modal-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 4px;
+}
+
+.privacy-modal-scroll:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.privacy-modal-scroll:hover {
+  scrollbar-width: thin; /* Firefox */
 }
 
 .privacy-modal-title {
@@ -1147,5 +1166,17 @@ h1, h2, h3, h4, h5, h6 {
 .privacy-modal-email-link:hover {
   color: var(--primary-hover);
   text-decoration: underline;
+}
+
+.landing-limitations-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+}
+
+@media (max-width: 768px) {
+  .landing-limitations-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
