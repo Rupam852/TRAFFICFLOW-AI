@@ -208,7 +208,8 @@ export default function App() {
   // Sync Supabase Auth session
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+      const sessionUser = session?.user ?? null;
+      setUser(prev => (prev?.id === sessionUser?.id ? prev : sessionUser));
       setAuthLoading(false);
       
       // Clean up trailing # or oauth tokens from URL hash once session is parsed
@@ -221,7 +222,8 @@ export default function App() {
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+      const sessionUser = session?.user ?? null;
+      setUser(prev => (prev?.id === sessionUser?.id ? prev : sessionUser));
       setAuthLoading(false);
       if (!session) {
         setAuthMode('landing');
@@ -336,7 +338,7 @@ export default function App() {
     };
 
     fetchUserData();
-  }, [user]);
+  }, [user?.id]);
 
   // Sync theme HTML attribute
   useEffect(() => {
