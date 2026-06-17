@@ -125,65 +125,6 @@ export default function LandingPage({ onNavigate }) {
               </a>
             </div>
           </div>
-
-          <div style={styles.heroRight}>
-            {/* Interactive Mock Map Dashboard */}
-            <div style={styles.dashboardMockup} className="glass-panel">
-              <div style={styles.mockHeader}>
-                <div style={styles.mockDots}>
-                  <span style={{ ...styles.mockDot, backgroundColor: '#ef4444' }} />
-                  <span style={{ ...styles.mockDot, backgroundColor: '#f59e0b' }} />
-                  <span style={{ ...styles.mockDot, backgroundColor: '#10b981' }} />
-                </div>
-                <div style={styles.mockAddressBar}>
-                  <span>https://trafficflowai.vercel.app/map</span>
-                </div>
-              </div>
-              <div style={styles.mockContent}>
-                {/* SVG/CSS Map Layout */}
-                <div style={styles.mockMapContainer}>
-                  {/* Grid Lines */}
-                  <div style={styles.mapGrid} />
-                  
-                  {/* Glowing Traffic Route Lines */}
-                  <svg style={styles.mapSvg} viewBox="0 0 400 300">
-                    {/* Background paths */}
-                    <path d="M 50 150 Q 150 100 200 150 T 350 150" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" strokeLinecap="round" />
-
-                    {/* Calculated Routes */}
-                    <path d="M 50 150 Q 150 100 200 150 T 350 150" fill="none" stroke="#ef4444" strokeWidth="4" strokeLinecap="round" className="pulse" style={{ opacity: 0.6 }} />
-                    <path d="M 50 150 L 150 150 Q 220 220 280 150 L 350 150" fill="none" stroke="#10b981" strokeWidth="4" strokeLinecap="round" strokeDasharray="6 4" />
-                    
-                    {/* Animated nodes */}
-                    <circle cx="50" cy="150" r="6" fill="var(--primary)" />
-                    <circle cx="350" cy="150" r="6" fill="#34d399" />
-                    
-                    {/* Pulsing locator */}
-                    <circle cx="200" cy="150" r="10" fill="rgba(99, 102, 241, 0.2)" stroke="var(--primary)" strokeWidth="2" />
-                    <circle cx="200" cy="150" r="3" fill="var(--primary)" />
-                  </svg>
-
-                  {/* UI Panel overlay */}
-                  <div style={styles.mockOverlayPanel} className="glass-panel">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                      <span style={{ fontSize: '10px', background: 'rgba(16,185,129,0.2)', color: '#10b981', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>FASTEST</span>
-                      <span style={{ fontSize: '11px', color: 'var(--text-primary)', fontWeight: '600' }}>Route Optimized</span>
-                    </div>
-                    <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ETA: 12 mins</div>
-                    <div style={{ fontSize: '10px', color: '#6366f1', marginTop: '4px' }}>AI Suggestion: Alternate path chosen due to jam.</div>
-                  </div>
-
-                  {/* Interactive Weather Effect Preview */}
-                  <div style={styles.mockWeatherLayer}>
-                    <div className="rain-drop" style={{ left: '20%', animationDelay: '0s' }} />
-                    <div className="rain-drop" style={{ left: '40%', animationDelay: '0.4s' }} />
-                    <div className="rain-drop" style={{ left: '60%', animationDelay: '0.2s' }} />
-                    <div className="rain-drop" style={{ left: '80%', animationDelay: '0.6s' }} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
@@ -438,21 +379,18 @@ const styles = {
   heroLayout: {
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     gap: '48px',
-    '@media (max-width: 960px)': {
-      flexDirection: 'column',
-      textAlign: 'center',
-    }
+    textAlign: 'center',
   },
   heroLeft: {
-    flex: 1.1,
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    '@media (max-width: 960px)': {
-      alignItems: 'center',
-    }
+    alignItems: 'center',
+    textAlign: 'center',
+    maxWidth: '800px',
+    margin: '0 auto',
   },
   badge: {
     display: 'inline-flex',
@@ -492,7 +430,8 @@ const styles = {
     color: '#94a3b8',
     lineHeight: '1.6',
     marginBottom: '36px',
-    maxWidth: '540px',
+    maxWidth: '700px',
+    margin: '0 auto 36px auto',
   },
   ctaGroup: {
     display: 'flex',
