@@ -207,11 +207,27 @@ export default function App() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
+      
+      // Clean up trailing # or oauth tokens from URL hash once session is parsed
+      if (window.location.href.includes('#')) {
+        setTimeout(() => {
+          const cleanUrl = window.location.href.split('#')[0];
+          window.history.replaceState(null, '', cleanUrl);
+        }, 100);
+      }
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
+      
+      // Clean up URL hash after successful sign in / redirect state change
+      if (window.location.href.includes('#')) {
+        setTimeout(() => {
+          const cleanUrl = window.location.href.split('#')[0];
+          window.history.replaceState(null, '', cleanUrl);
+        }, 100);
+      }
     });
 
     return () => subscription.unsubscribe();
