@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHand
 import { MapPin, Navigation, History, Map, MessageSquareText, Trash2, LogOut } from 'lucide-react';
 import AiPanel from './AiPanel';
 import { incrementApiUsage } from '../utils/usage';
-
 const Sidebar = forwardRef(function Sidebar({
   settings,
   isSidebarOpen,
@@ -27,9 +26,6 @@ const Sidebar = forwardRef(function Sidebar({
   routingError,
   isRoutesLoading,
   isRouteSwitching,
-  isRouteSimulationActive,
-  onStartSimulation,
-  onStopSimulation,
   activeTab,
   setActiveTab
 }, ref) {

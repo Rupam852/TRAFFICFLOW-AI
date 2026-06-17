@@ -7,11 +7,13 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(isInitialSignUp);
-  const [backHovered, setBackHovered] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
 
   useEffect(() => {
-    setIsSignUp(isInitialSignUp);
+    const timer = setTimeout(() => {
+      setIsSignUp(isInitialSignUp);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [isInitialSignUp]);
 
   const handleEmailAuth = async (e) => {

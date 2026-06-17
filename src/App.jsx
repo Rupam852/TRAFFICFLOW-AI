@@ -6,7 +6,7 @@ import MapView from './components/MapView';
 import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
-import { Menu, X, Map, LogOut } from 'lucide-react';
+import { Menu, X, Map } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
 
 // Speed (km/h) per travel mode — used for mock route duration estimation
@@ -135,6 +135,85 @@ const generateDynamicMockRoutes = (start, end, travelMode) => {
   ];
 };
 
+// Apply TomTom live traffic data to calculated routes immediately
+const applyTomTomTrafficToRoutes = async (routes, tomtomKey, travelMode) => {
+  if (!tomtomKey || !routes || routes.length === 0) return routes;
+  if (travelMode === 'walk' || travelMode === 'bicycle') return routes;
+
+  try {
+    const updatedRoutes = await Promise.all(
+      routes.map(async (route) => {
+        const geom = route.geometry;
+        if (!geom || geom.length < 2) return route;
+
+        try {
+          const midIdx = Math.floor(geom.length * 0.5);
+          const pt = geom[midIdx];
+          if (!pt) return route;
+
+          const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative-to-functional/10/json?key=${tomtomKey}&point=${pt[1]},${pt[0]}`;
+          const res = await fetchWithTimeout(url, { timeout: 3500 });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.flowSegmentData) {
+              const current = data.flowSegmentData.currentSpeed;
+              const freeFlow = data.flowSegmentData.freeFlowSpeed;
+              const travelTime = data.flowSegmentData.currentTravelTime;
+              const freeFlowTime = data.flowSegmentData.freeFlowTravelTime;
+              const delaySec = Math.max(0, (travelTime || 0) - (freeFlowTime || 0));
+
+              let newStatus = route.trafficStatus || 'smooth';
+              let newDelayInfo = route.delayInfo || null;
+              let trafficFactor = 1.0;
+
+              if (freeFlow > 0) {
+                const ratio = current / freeFlow;
+                if (ratio >= 0.85) {
+                  newStatus = 'smooth';
+                  trafficFactor = 1.0;
+                  newDelayInfo = null;
+                } else if (ratio >= 0.55) {
+                  newStatus = 'moderate';
+                  trafficFactor = 1.25;
+                  newDelayInfo = delaySec > 0 ? `${Math.round(delaySec / 60)} min traffic delay` : 'Moderate traffic congestion';
+                } else if (ratio >= 0.25) {
+                  newStatus = 'heavy';
+                  trafficFactor = 1.6;
+                  newDelayInfo = delaySec > 0 ? `Heavy delay: +${Math.round(delaySec / 60)} min` : 'Heavy traffic congestion';
+                } else {
+                  newStatus = 'blocked';
+                  trafficFactor = 2.5;
+                  newDelayInfo = 'Road highly congested or blocked';
+                }
+
+                // Parse base distance (e.g. "12.4 km")
+                const distKm = parseFloat(route.distance.replace(/[^\d.]/g, ''));
+                if (!isNaN(distKm)) {
+                  const baseSpeed = modeSpeed[travelMode] || 50;
+                  const newMins = (distKm / baseSpeed) * 60 * trafficFactor;
+                  return {
+                    ...route,
+                    trafficStatus: newStatus,
+                    delayInfo: newDelayInfo,
+                    duration: fmtDur(newMins)
+                  };
+                }
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Failed to fetch TomTom live traffic segment:', err);
+        }
+        return route;
+      })
+    );
+    return updatedRoutes;
+  } catch (globalErr) {
+    console.warn('Global error applying TomTom traffic to routes:', globalErr);
+    return routes;
+  }
+};
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -183,7 +262,7 @@ export default function App() {
   // Live GPS tracking states (marker position & orientation)
   const [navMarkerPos, setNavMarkerPos] = useState(null); // [lng, lat] of moving navigator dot
   const [navMarkerBearing, setNavMarkerBearing] = useState(null); // heading angle in degrees (0-360)
-  const [hasArrived, setHasArrived] = useState(false);       // true when user is near destination
+
   const [showArrivalToast, setShowArrivalToast] = useState(false); // controls arrival toast visibility
   const lastSearchedDestNameRef = useRef(null);
 
@@ -321,7 +400,7 @@ export default function App() {
 
   // Sync user database state on auth state changes
   useEffect(() => {
-    setDismissedKeySetup(false);
+    setTimeout(() => setDismissedKeySetup(false), 0);
     if (!user) {
       setTimeout(() => {
         setSearchHistory([]);
@@ -416,7 +495,7 @@ export default function App() {
     };
 
     fetchUserData();
-  }, [user?.id]);
+  }, [user]);
 
   // Sync theme HTML attribute
   useEffect(() => {
@@ -446,7 +525,7 @@ export default function App() {
     // Push a sentinel state so there's something to pop back to
     window.history.pushState({ dashboard: true }, '');
 
-    const handleDashboardPopState = (e) => {
+    const handleDashboardPopState = () => {
       const {
         isSettingsOpen,
         isGmapsAuthError,
@@ -727,18 +806,16 @@ export default function App() {
     if (navMarkerPos && destination?.coordinates) {
       const dist = haversineMetres(navMarkerPos, destination.coordinates);
       if (dist <= 300) {
-        setHasArrived(prev => {
-          if (!prev) {
-            setShowArrivalToast(true);
-            // Auto dismiss toast after 7 seconds
-            setTimeout(() => setShowArrivalToast(false), 7000);
-            return true;
-          }
-          return prev;
-        });
-      } else {
-        // Reset hasArrived status when moving away (or when selecting a new route)
-        setHasArrived(false);
+        setTimeout(() => {
+          setShowArrivalToast(prev => {
+            if (!prev) {
+              // Auto dismiss toast after 7 seconds
+              setTimeout(() => setShowArrivalToast(false), 7000);
+              return true;
+            }
+            return prev;
+          });
+        }, 0);
       }
     }
   }, [navMarkerPos, destination]);
@@ -1102,7 +1179,12 @@ export default function App() {
             });
 
             // Supplement routes using real roads if less than 3
-            const finalRoutes = await supplementWithRealRoads(routesParsed);
+            let finalRoutes = await supplementWithRealRoads(routesParsed);
+
+            // Fetch live TomTom traffic for the routes immediately if key is configured
+            if (settings.tomtomKey) {
+              finalRoutes = await applyTomTomTrafficToRoutes(finalRoutes, settings.tomtomKey, travelMode);
+            }
 
             setIsSimulationMode(false);
             setRoutingError(null);
@@ -1187,7 +1269,12 @@ export default function App() {
           });
 
           // Supplement routes using real roads if less than 3
-          const finalRoutes = await supplementWithRealRoads(routesParsed);
+          let finalRoutes = await supplementWithRealRoads(routesParsed);
+
+          // Fetch live TomTom traffic for the routes immediately if key is configured
+          if (settings.tomtomKey) {
+            finalRoutes = await applyTomTomTrafficToRoutes(finalRoutes, settings.tomtomKey, travelMode);
+          }
 
           setIsSimulationMode(false);
           if (mapboxErrorMsg) {
@@ -1205,7 +1292,13 @@ export default function App() {
       }
 
       // 3. Simulation mode fallback route data with dynamic interpolation
-      const mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
+      let mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
+
+      // Fetch live TomTom traffic for the routes immediately if key is configured
+      if (settings.tomtomKey) {
+        mockRoutes = await applyTomTomTrafficToRoutes(mockRoutes, settings.tomtomKey, travelMode);
+      }
+
       setIsSimulationMode(true);
       if (mapboxErrorMsg) {
         setRoutingError(`Mapbox API failed (${mapboxErrorMsg}). All backup routing APIs are offline. Simulation mode active.`);
@@ -1284,7 +1377,7 @@ export default function App() {
     }
 
 
-  }, [startLocation, destination, settings.mapboxKey, gmapsLoaded, user, travelMode]);
+  }, [startLocation, destination, settings.mapboxKey, settings.tomtomKey, gmapsLoaded, user, travelMode]);
 
   // Real-time traffic tracking loop (updates every 15 seconds when route is active)
   useEffect(() => {
@@ -1498,7 +1591,6 @@ export default function App() {
     stopRouteSimulation();
 
     setIsRouteSimulationActive(true);
-    setHasArrived(false);
     setShowArrivalToast(false);
 
     let currentIndex = 0;
@@ -1526,13 +1618,13 @@ export default function App() {
     }, 850);
   };
 
-  const stopRouteSimulation = () => {
+  function stopRouteSimulation() {
     if (simulationIntervalRef.current) {
       clearInterval(simulationIntervalRef.current);
       simulationIntervalRef.current = null;
     }
     setIsRouteSimulationActive(false);
-  };
+  }
 
   // Cleanup simulation timer on unmount
   useEffect(() => {
@@ -1553,7 +1645,6 @@ export default function App() {
     if (idx === selectedRouteIndex) return;
     setIsRouteSwitching(true);
     setSelectedRouteIndex(idx);
-    setHasArrived(false); // reset arrival on new route selection
 
     // After route switches, zoom map to user's current GPS position
     if (navigator.geolocation) {
@@ -1794,7 +1885,11 @@ export default function App() {
                 id="exit-confirm-yes"
                 onClick={() => {
                   setShowExitConfirm(false);
-                  try { window.close(); } catch (_) {}
+                  try {
+                    window.close();
+                  } catch {
+                    // Suppress window close permissions warning
+                  }
                   setTimeout(() => { if (!window.closed) window.location.href = 'about:blank'; }, 150);
                 }}
                 style={{
@@ -2073,6 +2168,7 @@ export default function App() {
         searchHistory={searchHistory}
         onSelectHistory={handleSelectHistory}
         onRemoveHistory={handleRemoveHistory}
+        onAmenitiesSearch={handleAmenitiesSearch}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
         user={user}

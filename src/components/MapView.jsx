@@ -1,73 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset, X, CloudSun, RotateCw, Box } from 'lucide-react';
 
-// Base styles to hide Tropic of Cancer/Equator latitude lines while keeping borders
-const googleMapsBaseStyles = [
-  {
-    featureType: "administrative",
-    elementType: "geometry",
-    stylers: [{ visibility: "off" }]
-  },
-  {
-    featureType: "administrative.country",
-    elementType: "geometry",
-    stylers: [{ visibility: "on" }]
-  },
-  {
-    featureType: "administrative.province",
-    elementType: "geometry",
-    stylers: [{ visibility: "on" }]
-  }
-];
-
-// Sleek Custom Dark Mode Styles for Google Maps
-const googleMapsDarkStyles = [
-  ...googleMapsBaseStyles,
-  { elementType: "geometry", stylers: [{ color: "#1e293b" }] },
-  { elementType: "labels.text.stroke", stylers: [{ color: "#1e293b" }] },
-  { elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
-  {
-    featureType: "administrative.locality",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#cbd5e1" }]
-  },
-  {
-    featureType: "poi",
-    elementType: "labels.text.fill",
-    stylers: [{ color: "#64748b" }]
-  },
-  {
-    featureType: "poi.park",
-    elementType: "geometry",
-    stylers: [{ color: "#0f172a" }]
-  },
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [{ color: "#334155" }]
-  },
-  {
-    featureType: "road",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#1e293b" }]
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry",
-    stylers: [{ color: "#475569" }]
-  },
-  {
-    featureType: "road.highway",
-    elementType: "geometry.stroke",
-    stylers: [{ color: "#1e293b" }]
-  },
-  {
-    featureType: "water",
-    elementType: "geometry",
-    stylers: [{ color: "#0f172a" }]
-  }
-];
-
 export default function MapView({
   settings,
   gmapsLoaded,
@@ -89,7 +22,6 @@ export default function MapView({
   activeAmenitySearch,
   onPoisFound,
   onAmenitiesSearchFallback,
-  activeRoutingEngine,
   routingError,
   isRoutesLoading,
   isRouteSwitching,
@@ -218,7 +150,7 @@ export default function MapView({
       }, 100);
       return () => clearInterval(interval);
     }
-  }, [gmapsLoaded, settings.theme]);
+  }, [gmapsLoaded, settings.theme, setIsWeatherPanelOpen]);
 
   // Handle drawing markers, routes, and POIs on the Google Map
   useEffect(() => {
@@ -457,7 +389,9 @@ export default function MapView({
       // First time GPS arrives: zoom to user location at street level
       mapRef.current.panTo(latlng);
       mapRef.current.setZoom(16);
-      setAutoFollow(true);
+      setTimeout(() => {
+        setAutoFollow(true);
+      }, 0);
     } else {
       navMarkerRef.current.setPosition(latlng);
       navMarkerRef.current.setIcon(markerIcon);
@@ -471,14 +405,14 @@ export default function MapView({
         mapRef.current.setTilt(45); // 3D navigation perspective
       }
     }
-    // Note: Omitted the 'else' blocks that reset heading and tilt to 0. 
-    // This allows the user to rotate, pan, and tilt the map freely without it snapping back to North-up.
   }, [navMarkerPos, navMarkerBearing, mapLoaded, autoFollow]);
 
   // Handle automatic follow reset when route simulation starts/stops
   useEffect(() => {
     if (isRouteSimulationActive) {
-      setAutoFollow(true);
+      setTimeout(() => {
+        setAutoFollow(true);
+      }, 0);
       if (mapRef.current && navMarkerPos) {
         const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
         mapRef.current.setZoom(16);

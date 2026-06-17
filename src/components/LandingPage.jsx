@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Navigation, ArrowRight, ShieldCheck, Cpu, CloudRain, Map, ChevronDown, ChevronUp, Zap, GitMerge, BarChart3, Clock, X } from 'lucide-react';
+import { Navigation, ArrowRight, CloudRain, Map, ChevronDown, ChevronUp, Zap, GitMerge, X } from 'lucide-react';
 
 export default function LandingPage({ onNavigate }) {
   const [activeFaq, setActiveFaq] = useState(null);
@@ -7,7 +7,9 @@ export default function LandingPage({ onNavigate }) {
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
 
   useEffect(() => {
-    setAnimateGrid(true);
+    setTimeout(() => {
+      setAnimateGrid(true);
+    }, 0);
   }, []);
 
   const toggleFaq = (index) => {
