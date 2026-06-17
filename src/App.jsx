@@ -1411,7 +1411,6 @@ export default function App() {
         searchHistory={searchHistory}
         onSelectHistory={handleSelectHistory}
         onRemoveHistory={handleRemoveHistory}
-        onAmenitiesSearch={handleAmenitiesSearch}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onLogout={handleLogout}
         user={user}

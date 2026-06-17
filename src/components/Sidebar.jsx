@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { MapPin, Navigation, History, Map, Coffee, Fuel, MessageSquareText, Trash2, LogOut } from 'lucide-react';
+import { MapPin, Navigation, History, Map, MessageSquareText, Trash2, LogOut } from 'lucide-react';
 import AiPanel from './AiPanel';
 import { incrementApiUsage } from '../utils/usage';
 
@@ -17,7 +17,6 @@ export default function Sidebar({
   searchHistory,
   onSelectHistory,
   onRemoveHistory,
-  onAmenitiesSearch,
   onOpenSettings,
   onLogout,
   user,
@@ -374,9 +373,7 @@ export default function Sidebar({
     if (onCollapse) onCollapse();
   };
 
-  const handleQuickAmenity = (type) => {
-    onAmenitiesSearch(type);
-  };
+
 
 
 
@@ -630,28 +627,7 @@ export default function Sidebar({
               </div>
             </div>
 
-            {/* Quick Amenities Shortcuts */}
-            <div style={styles.section}>
-              <span style={styles.sectionTitle}>Amenities Shortcuts</span>
-              <div style={styles.amenitiesGrid}>
-                <button onClick={() => handleQuickAmenity('petrol')} style={styles.amenityBtn}>
-                  <Fuel size={16} style={{ color: '#f59e0b' }} />
-                  <span>Petrol</span>
-                </button>
-                <button onClick={() => handleQuickAmenity('restaurant')} style={styles.amenityBtn}>
-                  <Coffee size={16} style={{ color: '#ef4444' }} />
-                  <span>Food</span>
-                </button>
-                <button onClick={() => handleQuickAmenity('hotel')} style={styles.amenityBtn}>
-                  🏨
-                  <span>Hotels</span>
-                </button>
-                <button onClick={() => handleQuickAmenity('hospital')} style={styles.amenityBtn}>
-                  🏥
-                  <span>Hospitals</span>
-                </button>
-              </div>
-            </div>
+
 
             {/* Alternative Routes display */}
             {((routeOptions && routeOptions.length > 0) || isRoutesLoading) && (
@@ -1042,30 +1018,7 @@ const styles = {
     letterSpacing: '0.05em',
     marginBottom: '10px',
   },
-  amenitiesGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(4, 1fr)',
-    gap: '8px',
-  },
-  amenityBtn: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '4px',
-    padding: '10px 6px',
-    borderRadius: '8px',
-    border: '1px solid var(--border-color)',
-    background: 'var(--bg-secondary)',
-    color: 'var(--text-primary)',
-    fontSize: '0.7rem',
-    fontWeight: '600',
-    cursor: 'pointer',
-    transition: 'var(--transition-smooth)',
-    '&:hover': {
-      borderColor: 'var(--primary)',
-      backgroundColor: 'var(--bg-tertiary)',
-    },
-  },
+
   routesList: {
     display: 'flex',
     flexDirection: 'column',

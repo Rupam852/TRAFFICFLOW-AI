@@ -41,7 +41,7 @@ Provide a concise, professional analysis (max 3 short paragraphs):
     incrementApiUsage('ai'); // Track real API usage
     if (provider === 'gemini') {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -65,7 +65,7 @@ Provide a concise, professional analysis (max 3 short paragraphs):
         }
       );
       const data = await response.json();
-      if (data.candidates && data.candidates[0].content.parts[0].text) {
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
         return data.candidates[0].content.parts[0].text;
       }
       throw new Error(data.error?.message || 'Failed to parse Gemini response.');
