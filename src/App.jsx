@@ -387,7 +387,7 @@ export default function App() {
     const script = document.createElement('script');
     script.id = 'google-maps-sdk';
     // Load keyless by default for public usage, or use key if provided in settings
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.googleMapsKey || ''}&libraries=places`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.googleMapsKey || ''}&libraries=places&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => setGmapsLoaded(true);

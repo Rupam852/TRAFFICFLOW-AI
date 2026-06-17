@@ -153,10 +153,12 @@ export default function MapView({
           streetViewControl: false,
           fullscreenControl: false,
           renderingType: 'VECTOR', // Enable WebGL Vector maps for rotation & tilt
-          tilt: 0,
+          tilt: 45, // Set default tilt to 45 so vector rendering features are obvious
           heading: 0,
           mapId: 'DEMO_MAP_ID', // Enable vector features like rotation and tilt on mobile
           gestureHandling: 'greedy', // Enable single-finger panning on mobile
+          rotateControl: true, // Show rotate control
+          tiltControl: true, // Show tilt control
         });
 
         // Collapse sidebar on map click
