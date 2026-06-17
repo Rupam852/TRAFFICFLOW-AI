@@ -1,13 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, ShieldAlert, ArrowRight, Navigation, Loader2 } from 'lucide-react';
+import { Mail, Lock, ShieldAlert, ArrowRight, Navigation, Loader2, ArrowLeft } from 'lucide-react';
 
-export default function Auth({ onAuthSuccess }) {
+export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToLanding }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(isInitialSignUp);
+  const [backHovered, setBackHovered] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+
+  useEffect(() => {
+    setIsSignUp(isInitialSignUp);
+  }, [isInitialSignUp]);
 
   const handleEmailAuth = async (e) => {
     e.preventDefault();
@@ -106,6 +111,21 @@ export default function Auth({ onAuthSuccess }) {
 
       <div style={styles.formSection}>
         <div className="glass-panel" style={styles.authCard}>
+          {onBackToLanding && (
+            <button
+              onClick={onBackToLanding}
+              onMouseEnter={() => setBackHovered(true)}
+              onMouseLeave={() => setBackHovered(false)}
+              style={{
+                ...styles.backBtn,
+                color: backHovered ? 'var(--text-primary)' : 'var(--text-secondary)',
+              }}
+              title="Back to Landing Page"
+            >
+              <ArrowLeft size={14} />
+              <span>Back to Home</span>
+            </button>
+          )}
           <h2 style={styles.title}>{isSignUp ? 'Create Account' : 'Welcome Back'}</h2>
           <p style={styles.subtitle}>
             {isSignUp ? 'Get started with TrafficFlow AI today' : 'Sign in to access your saved bookmarks and maps'}
@@ -423,5 +443,19 @@ const styles = {
     cursor: 'pointer',
     outline: 'none',
     fontSize: '0.85rem',
+  },
+  backBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    background: 'none',
+    border: 'none',
+    fontSize: '0.85rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    marginBottom: '20px',
+    padding: 0,
+    transition: 'color 0.2s',
+    outline: 'none',
   },
 };

@@ -125,6 +125,30 @@ h1, h2, h3, h4, h5, h6 {
   100% { transform: translateX(-5%); }
 }
 
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.pulse {
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes rainFall {
+  0% { transform: translateY(-40px); opacity: 0; }
+  30% { opacity: 0.8; }
+  100% { transform: translateY(120px); opacity: 0; }
+}
+
+.rain-drop {
+  position: absolute;
+  width: 1.5px;
+  height: 15px;
+  background: linear-gradient(transparent, #60a5fa);
+  animation: rainFall 1.5s infinite linear;
+  pointer-events: none;
+}
+
 /* Custom Scrollbars */
 ::-webkit-scrollbar {
   width: 6px;

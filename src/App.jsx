@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from './lib/supabase';
 import Auth from './components/Auth';
+import LandingPage from './components/LandingPage';
 import MapView from './components/MapView';
 import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
@@ -137,6 +138,7 @@ const generateDynamicMockRoutes = (start, end, travelMode) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [authMode, setAuthMode] = useState('landing'); // 'landing' | 'login' | 'signup'
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
   const [dismissedKeySetup, setDismissedKeySetup] = useState(false);
@@ -220,6 +222,9 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setAuthLoading(false);
+      if (!session) {
+        setAuthMode('landing');
+      }
       
       // Clean up URL hash after successful sign in / redirect state change
       if (window.location.href.includes('#')) {
@@ -466,6 +471,7 @@ export default function App() {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setAuthMode('landing');
   };
 
   const handleSaveSettings = async (newSettings) => {
@@ -1257,9 +1263,27 @@ export default function App() {
     );
   }
 
-  // Render Authentication screen if not signed in
+  // Render Landing Page or Authentication screens if not signed in
   if (!user) {
-    return <Auth onAuthSuccess={handleAuthSuccess} />;
+    if (authMode === 'login') {
+      return (
+        <Auth 
+          isInitialSignUp={false} 
+          onAuthSuccess={handleAuthSuccess} 
+          onBackToLanding={() => setAuthMode('landing')} 
+        />
+      );
+    }
+    if (authMode === 'signup') {
+      return (
+        <Auth 
+          isInitialSignUp={true} 
+          onAuthSuccess={handleAuthSuccess} 
+          onBackToLanding={() => setAuthMode('landing')} 
+        />
+      );
+    }
+    return <LandingPage onNavigate={setAuthMode} />;
   }
 
   return (
