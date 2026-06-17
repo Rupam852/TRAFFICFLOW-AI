@@ -6,7 +6,7 @@ import MapView from './components/MapView';
 import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
-import { Menu, X, Map } from 'lucide-react';
+import { Menu, X, Map, LogOut } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
 
 // Speed (km/h) per travel mode — used for mock route duration estimation
@@ -143,6 +143,8 @@ export default function App() {
     const searchParams = new URLSearchParams(window.location.search);
     return searchParams.get('page') || 'landing';
   });
+  // Ref to track authMode inside event listeners without stale closure issues
+  const authModeRef = useRef(authMode);
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
   const [dismissedKeySetup, setDismissedKeySetup] = useState(false);
@@ -207,12 +209,27 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareEtaOpen, setIsShareEtaOpen] = useState(false);
   const [showWarningOnLogin, setShowWarningOnLogin] = useState(false);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   // Synchronize authMode view with URL query parameters for browser navigation support
   useEffect(() => {
-    const handlePopState = () => {
+    const handlePopState = (e) => {
       const searchParams = new URLSearchParams(window.location.search);
       const page = searchParams.get('page') || 'landing';
+
+      // If we're on login/signup and back-navigation would leave the app entirely
+      // (i.e. no ?page param in the destination URL), show the exit confirm dialog
+      if (!page || page === 'landing') {
+        // Check if we actually have an in-app landing to go back to
+        const isOnAuthScreen = authModeRef.current === 'login' || authModeRef.current === 'signup';
+        if (isOnAuthScreen) {
+          // Suppress the navigation by pushing the state back, then show exit dialog
+          window.history.pushState({ authMode: authModeRef.current }, '', window.location.href);
+          setShowExitConfirm(true);
+          return;
+        }
+      }
+
       setAuthMode(page);
     };
 
@@ -381,6 +398,11 @@ export default function App() {
     }
     vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
   }, [settings.theme]);
+
+  // Keep authModeRef in sync (used by popstate listener to avoid stale closures)
+  useEffect(() => {
+    authModeRef.current = authMode;
+  }, [authMode]);
 
   // Sync weather storage
   useEffect(() => {
@@ -1374,12 +1396,149 @@ export default function App() {
   if (!user) {
     if (authMode === 'login' || authMode === 'signup') {
       return (
-        <Auth 
-          isInitialSignUp={authMode === 'signup'} 
-          onAuthSuccess={handleAuthSuccess} 
-          onBackToLanding={handleBackToLanding}
-          onToggleMode={(mode) => handleNavigate(mode, true)}
-        />
+        <>
+          <Auth 
+            isInitialSignUp={authMode === 'signup'} 
+            onAuthSuccess={handleAuthSuccess} 
+            onBackToLanding={handleBackToLanding}
+            onToggleMode={(mode) => handleNavigate(mode, true)}
+          />
+
+          {/* ─── Exit App Confirmation Dialog ─── */}
+          {showExitConfirm && (
+            <div style={{
+              position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+              background: 'rgba(5, 8, 22, 0.82)',
+              backdropFilter: 'blur(16px)',
+              WebkitBackdropFilter: 'blur(16px)',
+              zIndex: 99999,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              padding: '20px',
+              animation: 'fadeIn 0.2s ease',
+            }}>
+              <div style={{
+                background: 'linear-gradient(145deg, rgba(15,20,40,0.98) 0%, rgba(20,28,58,0.98) 100%)',
+                border: '1px solid rgba(99,102,241,0.25)',
+                borderRadius: '24px',
+                padding: '36px 32px',
+                maxWidth: '360px',
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                textAlign: 'center',
+                gap: '12px',
+                boxShadow: '0 32px 64px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.07)',
+                animation: 'slideUp 0.25s cubic-bezier(0.34,1.56,0.64,1)',
+              }}>
+                {/* Icon */}
+                <div style={{
+                  width: '64px', height: '64px', borderRadius: '18px',
+                  background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.08) 100%)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '2rem', marginBottom: '4px',
+                }}>
+                  🚪
+                </div>
+
+                {/* Title */}
+                <h2 style={{
+                  fontSize: '1.25rem', fontWeight: '800',
+                  color: '#f1f5f9', margin: 0,
+                  letterSpacing: '-0.02em',
+                  fontFamily: 'var(--font-sans)',
+                }}>Exit App?</h2>
+
+                {/* Subtitle */}
+                <p style={{
+                  fontSize: '0.875rem', color: 'rgba(148,163,184,0.85)',
+                  lineHeight: '1.55', margin: 0,
+                  fontFamily: 'var(--font-sans)',
+                }}>
+                  Are you sure you want to leave TrafficFlow AI?
+                </p>
+
+                {/* Buttons */}
+                <div style={{
+                  display: 'flex', gap: '12px', width: '100%', marginTop: '8px',
+                }}>
+                  {/* No — stay */}
+                  <button
+                    id="exit-confirm-no"
+                    onClick={() => setShowExitConfirm(false)}
+                    style={{
+                      flex: 1,
+                      padding: '13px 0',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(99,102,241,0.3)',
+                      background: 'rgba(99,102,241,0.1)',
+                      color: '#a5b4fc',
+                      fontSize: '0.92rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-sans)',
+                      transition: 'all 0.18s ease',
+                      letterSpacing: '0.01em',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'rgba(99,102,241,0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(99,102,241,0.55)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'rgba(99,102,241,0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(99,102,241,0.3)';
+                    }}
+                  >
+                    No, Stay
+                  </button>
+
+                  {/* Yes — exit */}
+                  <button
+                    id="exit-confirm-yes"
+                    onClick={() => {
+                      setShowExitConfirm(false);
+                      // Try to close the tab; fallback to navigating to a blank page
+                      try {
+                        window.close();
+                      } catch (_) {}
+                      // If window.close() is blocked by the browser, navigate away
+                      setTimeout(() => {
+                        if (!window.closed) {
+                          window.location.href = 'about:blank';
+                        }
+                      }, 150);
+                    }}
+                    style={{
+                      flex: 1,
+                      padding: '13px 0',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      background: 'linear-gradient(135deg, rgba(239,68,68,0.18) 0%, rgba(220,38,38,0.12) 100%)',
+                      color: '#fca5a5',
+                      fontSize: '0.92rem',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-sans)',
+                      transition: 'all 0.18s ease',
+                      letterSpacing: '0.01em',
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.32) 0%, rgba(220,38,38,0.24) 100%)';
+                      e.currentTarget.style.borderColor = 'rgba(239,68,68,0.55)';
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.18) 0%, rgba(220,38,38,0.12) 100%)';
+                      e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)';
+                    }}
+                  >
+                    Yes, Exit
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       );
     }
     return <LandingPage onNavigate={handleNavigate} />;
