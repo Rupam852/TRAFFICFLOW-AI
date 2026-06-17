@@ -149,50 +149,20 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
-/* ─── Custom Scrollbars ───────────────────────────────────────────────────
-   Strategy:
-   • Track width = 0 by default → completely invisible, takes NO space
-   • On hover over a scrollable element → track expands to 5px + faint thumb
-   • On hover over the thumb itself → accent color highlight
-   • overflow: auto on containers means scrollbar only appears when content
-     actually overflows, so no track is ever shown for non-scrolling panels
+/* ─── Hide Scrollbars Globally ───────────────────────────────────────────
+   Strategy: Completely hide scrollbars everywhere but keep scrolling functionality.
    ───────────────────────────────────────────────────────────────────────── */
 
 /* Firefox */
 * {
-  scrollbar-width: none;             /* Completely hidden by default */
-  scrollbar-color: transparent transparent;
-}
-*:hover {
-  scrollbar-width: thin;             /* Appear faintly on hover */
-  scrollbar-color: rgba(148, 163, 184, 0.30) transparent;
+  scrollbar-width: none;
 }
 
 /* Webkit (Chrome / Edge / Safari) */
 ::-webkit-scrollbar {
-  width: 0;                          /* 0px default → invisible, no layout shift */
-  height: 0;
-  transition: width 0.3s ease;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 4px;
-}
-
-/* Expand only when the element is hovered */
-*:hover::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
-}
-*:hover::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.30);
-  transition: background 0.3s ease;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.60) !important;
+  width: 0px;
+  height: 0px;
+  display: none;
 }
 
 /* Layout Utilities */
@@ -1126,25 +1096,6 @@ h1, h2, h3, h4, h5, h6 {
 .privacy-modal-scroll {
   overflow-y: auto;
   padding-right: 8px;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE */
-}
-
-.privacy-modal-scroll::-webkit-scrollbar {
-  width: 4px;
-}
-
-.privacy-modal-scroll::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 4px;
-}
-
-.privacy-modal-scroll:hover::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.privacy-modal-scroll:hover {
-  scrollbar-width: thin; /* Firefox */
 }
 
 .privacy-modal-title {
