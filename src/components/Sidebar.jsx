@@ -744,60 +744,7 @@ export default function Sidebar({
                         </div>
                       )}
 
-                      {routeOptions.length > 0 && (
-                        <div style={{
-                          marginTop: '12px',
-                          padding: '12px',
-                          borderRadius: '12px',
-                          background: 'rgba(59, 130, 246, 0.08)',
-                          border: '1px solid rgba(59, 130, 246, 0.2)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '8px'
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.8rem', fontWeight: '700', color: 'var(--text-primary)' }}>
-                              🧭 Demo Navigation Run
-                            </span>
-                            <span style={{
-                              fontSize: '0.65rem',
-                              padding: '2px 6px',
-                              borderRadius: '8px',
-                              backgroundColor: isRouteSimulationActive ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255,255,255,0.06)',
-                              color: isRouteSimulationActive ? '#10b981' : 'var(--text-muted)',
-                              fontWeight: '700'
-                            }}>
-                              {isRouteSimulationActive ? 'SIMULATING' : 'READY'}
-                            </span>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={isRouteSimulationActive ? onStopSimulation : onStartSimulation}
-                            className="glow-btn"
-                            style={{
-                              width: '100%',
-                              padding: '8px 12px',
-                              fontSize: '0.82rem',
-                              backgroundColor: isRouteSimulationActive ? '#ef4444' : 'var(--primary)',
-                              boxShadow: isRouteSimulationActive ? '0 0 10px rgba(239, 68, 68, 0.3)' : '0 0 10px var(--primary-glow)',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            {isRouteSimulationActive ? (
-                              <>
-                                <span>⏹️</span> Stop Navigation Demo
-                              </>
-                            ) : (
-                              <>
-                                <span>▶️</span> Start Navigation Demo
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )}
+
                     </>
                   )}
 
