@@ -27,7 +27,8 @@ export default function Sidebar({
   user,
   onShareEta,
   travelMode,
-  onTravelModeChange
+  onTravelModeChange,
+  isSimulationMode
 }) {
   const [activeTab, setActiveTab] = useState('nav'); // 'nav' or 'ai'
   const [startInput, setStartInput] = useState(startLocation?.name || '');
@@ -529,6 +530,23 @@ export default function Sidebar({
       <div style={styles.panelContent}>
         {activeTab === 'nav' ? (
           <div style={styles.navPanel}>
+            {isSimulationMode && (
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.12)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '0.78rem',
+                color: '#f87171',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                lineHeight: '1.4'
+              }}>
+                <span style={{ marginRight: '8px', fontSize: '1rem' }}>⚠️</span>
+                <span><strong>Simulation Mode:</strong> Routing APIs offline. Path is direct.</span>
+              </div>
+            )}
             
             {/* Search Input Form */}
             <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
@@ -820,6 +838,30 @@ export default function Sidebar({
                           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                             {route.isRecommended && (
                               <span style={styles.recommendedBadge}>RECOMMENDED</span>
+                            )}
+                             {isSelected && (
+                              <span style={{
+                                fontSize: '0.62rem',
+                                fontWeight: '800',
+                                color: '#10b981',
+                                border: '1px solid rgba(16, 185, 129, 0.3)',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                padding: '2px 6px',
+                                borderRadius: '10px',
+                                letterSpacing: '0.04em',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '3px'
+                              }}>
+                                <span className="pulse-dot" style={{
+                                  width: '5px',
+                                  height: '5px',
+                                  borderRadius: '50%',
+                                  backgroundColor: '#10b981',
+                                  display: 'inline-block'
+                                }} />
+                                LIVE
+                              </span>
                             )}
                             <span style={{ ...styles.trafficBadge, backgroundColor: statusColor }}>
                               {route.trafficStatus.toUpperCase()}

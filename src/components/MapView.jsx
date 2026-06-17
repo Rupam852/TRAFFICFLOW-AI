@@ -85,6 +85,10 @@ export default function MapView({
   onMapClick,
   navMarkerPos,
   navMarkerBearing,
+  onMapCenterChange,
+  activeAmenitySearch,
+  onPoisFound,
+  onAmenitiesSearchFallback,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -103,12 +107,18 @@ export default function MapView({
   const onMapClickRef = useRef(onMapClick);
   const onPoiClickRef = useRef(onPoiClick);
   const onRouteSelectedRef = useRef(onRouteSelected);
+  const onMapCenterChangeRef = useRef(onMapCenterChange);
+  const onPoisFoundRef = useRef(onPoisFound);
+  const onAmenitiesSearchFallbackRef = useRef(onAmenitiesSearchFallback);
 
   useEffect(() => {
     onMapClickRef.current = onMapClick;
     onPoiClickRef.current = onPoiClick;
     onRouteSelectedRef.current = onRouteSelected;
-  }, [onMapClick, onPoiClick, onRouteSelected]);
+    onMapCenterChangeRef.current = onMapCenterChange;
+    onPoisFoundRef.current = onPoisFound;
+    onAmenitiesSearchFallbackRef.current = onAmenitiesSearchFallback;
+  }, [onMapClick, onPoiClick, onRouteSelected, onMapCenterChange, onPoisFound, onAmenitiesSearchFallback]);
 
   const timeOverlays = {
     day: 'rgba(0, 0, 0, 0)',
@@ -148,6 +158,14 @@ export default function MapView({
         // Detect manual dragging to disable auto-follow
         map.addListener('dragstart', () => {
           setAutoFollow(false);
+        });
+
+        // Track map center changes
+        map.addListener('idle', () => {
+          const center = map.getCenter();
+          if (center && onMapCenterChangeRef.current) {
+            onMapCenterChangeRef.current([center.lng(), center.lat()]);
+          }
         });
 
         mapRef.current = map;
@@ -396,6 +414,66 @@ export default function MapView({
       mapRef.current.panTo(latlng);
     }
   }, [navMarkerPos, navMarkerBearing, mapLoaded, autoFollow]);
+
+  // Handle active amenity searches around map center
+  useEffect(() => {
+    if (!activeAmenitySearch || !mapRef.current || !window.google || !window.google.maps) {
+      return;
+    }
+
+    const { type } = activeAmenitySearch;
+    const map = mapRef.current;
+    const center = map.getCenter();
+    if (!center) return;
+
+    const googleTypes = {
+      petrol: 'gas_station',
+      restaurant: 'restaurant',
+      hotel: 'lodging',
+      hospital: 'hospital'
+    };
+
+    const googleType = googleTypes[type];
+
+    // If Places API is loaded, do a real search
+    if (window.google.maps.places) {
+      try {
+        const service = new window.google.maps.places.PlacesService(map);
+        service.nearbySearch(
+          {
+            location: center,
+            radius: 5000, // 5km search radius
+            type: [googleType]
+          },
+          (results, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+              const list = results.map(r => ({
+                name: r.name,
+                type: type,
+                coordinates: [r.geometry.location.lng(), r.geometry.location.lat()]
+              }));
+              if (onPoisFoundRef.current) {
+                onPoisFoundRef.current(list);
+              }
+            } else {
+              console.warn('Google Places nearby search returned status:', status);
+              if (onAmenitiesSearchFallbackRef.current) {
+                onAmenitiesSearchFallbackRef.current(type, [center.lng(), center.lat()]);
+              }
+            }
+          }
+        );
+        return;
+      } catch (e) {
+        console.error('Failed to execute Google Places nearby search:', e);
+      }
+    }
+
+    // Fallback if places library is not loaded
+    if (onAmenitiesSearchFallbackRef.current) {
+      onAmenitiesSearchFallbackRef.current(type, [center.lng(), center.lat()]);
+    }
+  }, [activeAmenitySearch]);
 
   // Weather Animations Loop (HTML5 Canvas overlay)
   useEffect(() => {

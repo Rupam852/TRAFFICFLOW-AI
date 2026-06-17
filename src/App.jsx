@@ -11,6 +11,24 @@ import { incrementApiUsage } from './utils/usage';
 // Speed (km/h) per travel mode — used for mock route duration estimation
 const modeSpeed = { car: 50, motorbike: 65, bicycle: 18, walk: 5 };
 
+// Fetch helper with timeout to prevent hanging promises
+const fetchWithTimeout = async (resource, options = {}) => {
+  const { timeout = 5000 } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+};
+
 // Format total minutes → Google Maps style: "X days Y hr Z min", "X hr Y min" or "Z min"
 const fmtDur = (totalMinutes) => {
   const mins = Math.max(1, Math.round(totalMinutes));
@@ -135,6 +153,9 @@ export default function App() {
   const [routeOptions, setRouteOptions] = useState([]);
   const [selectedRouteIndex, setSelectedRouteIndex] = useState(0);
   const [pois, setPois] = useState([]);
+  const [mapCenter, setMapCenter] = useState([77.2090, 28.6139]);
+  const [activeAmenitySearch, setActiveAmenitySearch] = useState(null);
+  const [isSimulationMode, setIsSimulationMode] = useState(false);
 
   // Weather & Time States
   const [weather, setWeather] = useState(localStorage.getItem('tf_weather') || 'clear');
@@ -542,46 +563,51 @@ export default function App() {
         return result;
       };
 
-      // Helper to fetch a real road route geometry from OSRM
+      // Helper to fetch a real road route geometry from OSRM (with retry/fallback and timeout)
       const fetchOSRMRouteGeometry = async (offsetDirection = 0, trafficMultiplier = 1) => {
-        try {
-          let osrmProfile = 'driving';
-          if (travelMode === 'bicycle') osrmProfile = 'bicycle';
-          if (travelMode === 'walk') osrmProfile = 'foot';
+        let osrmProfile = 'driving';
+        if (travelMode === 'bicycle') osrmProfile = 'bicycle';
+        if (travelMode === 'walk') osrmProfile = 'foot';
 
-          let url;
-          if (offsetDirection !== 0) {
-            const dLng = end[0] - start[0];
-            const dLat = end[1] - start[1];
-            const distance = Math.sqrt(dLng * dLng + dLat * dLat);
-            if (distance < 0.005) return null;
+        // Prepare waypoints
+        let coordsPath = `${start[0]},${start[1]}`;
+        if (offsetDirection !== 0) {
+          const dLng = end[0] - start[0];
+          const dLat = end[1] - start[1];
+          const distance = Math.sqrt(dLng * dLng + dLat * dLat);
+          if (distance < 0.005) return null;
 
-            const offsetFactor = 0.15 * offsetDirection;
-            const midLng = start[0] + dLng * 0.5 - dLat * offsetFactor;
-            const midLat = start[1] + dLat * 0.5 + dLng * offsetFactor;
-            url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${start[0]},${start[1]};${midLng},${midLat};${end[0]},${end[1]}?geometries=geojson&overview=full`;
-          } else {
-            url = `https://router.project-osrm.org/route/v1/${osrmProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&overview=full`;
+          const offsetFactor = 0.15 * offsetDirection;
+          const midLng = start[0] + dLng * 0.5 - dLat * offsetFactor;
+          const midLat = start[1] + dLat * 0.5 + dLng * offsetFactor;
+          coordsPath += `;${midLng},${midLat}`;
+        }
+        coordsPath += `;${end[0]},${end[1]}`;
+
+        // Attempt primary, then fallback
+        const servers = [
+          `https://router.project-osrm.org/route/v1/${osrmProfile}/${coordsPath}?geometries=geojson&overview=full`,
+          `https://routing.openstreetmap.de/${travelMode === 'bicycle' ? 'routed-bike' : travelMode === 'walk' ? 'routed-foot' : 'routed-car'}/route/v1/${osrmProfile}/${coordsPath}?geometries=geojson&overview=full`
+        ];
+
+        for (const url of servers) {
+          try {
+            const res = await fetchWithTimeout(url, { timeout: 5000 });
+            if (!res.ok) continue;
+            const data = await res.json();
+            if (data.code === 'Ok' && data.routes && data.routes[0]) {
+              const distKm = data.routes[0].distance / 1000;
+              const baseSpeed = modeSpeed[travelMode] || 50;
+              const calculatedMin = (distKm / baseSpeed) * 60 * trafficMultiplier;
+              return {
+                geometry: pinRoute(data.routes[0].geometry.coordinates),
+                distance: distKm.toFixed(1) + ' km',
+                duration: fmtDur(calculatedMin),
+              };
+            }
+          } catch (e) {
+            console.warn(`OSRM call failed on ${url}:`, e);
           }
-
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data.code === 'Ok' && data.routes && data.routes[0]) {
-            const distKm = data.routes[0].distance / 1000;
-
-            // Recalculate duration from distance × mode speed so it's always accurate
-            // (OSRM offset-waypoint routes can return incorrect times for foot/bicycle)
-            const baseSpeed = modeSpeed[travelMode] || 50; // km/h
-            const calculatedMin = (distKm / baseSpeed) * 60 * trafficMultiplier;
-
-            return {
-              geometry: pinRoute(data.routes[0].geometry.coordinates),
-              distance: distKm.toFixed(1) + ' km',
-              duration: fmtDur(calculatedMin),
-            };
-          }
-        } catch (e) {
-          console.warn('Failed to fetch OSRM route geometry:', e);
         }
         return null;
       };
@@ -590,7 +616,10 @@ export default function App() {
       const supplementWithRealRoads = async (routesList) => {
         let finalRoutes = [...routesList];
         if (finalRoutes.length < 3) {
-          if (finalRoutes.length === 1) {
+          if (finalRoutes.length === 0) {
+            const mockAlternatives = generateDynamicMockRoutes(start, end, travelMode);
+            finalRoutes = mockAlternatives;
+          } else if (finalRoutes.length === 1) {
             const geom1 = await fetchOSRMRouteGeometry(1, 1.2);  // moderate traffic +20%
             if (geom1) {
               finalRoutes.push({
@@ -629,7 +658,6 @@ export default function App() {
               });
             }
           }
-
 
           // Absolute fallback if OSRM also failed to yield enough alternative routes
           if (finalRoutes.length < 3) {
@@ -713,6 +741,7 @@ export default function App() {
             // Supplement routes using real roads if less than 3
             const finalRoutes = await supplementWithRealRoads(routesParsed);
 
+            setIsSimulationMode(false);
             setRouteOptions(finalRoutes);
             setSelectedRouteIndex(0);
             return;
@@ -769,6 +798,7 @@ export default function App() {
             // Supplement routes using real roads if less than 3
             const finalRoutes = await supplementWithRealRoads(routesParsed);
 
+            setIsSimulationMode(false);
             setRouteOptions(finalRoutes);
             setSelectedRouteIndex(0);
             return;
@@ -778,17 +808,34 @@ export default function App() {
         }
       }
 
-      // 3. Try free OSRM (Open Source Routing Machine) API as a high-quality fallback
+      // 3. Try free OSRM (Open Source Routing Machine) API as a high-quality fallback (with retry & timeout)
       try {
         let osrmProfile = 'driving';
         if (travelMode === 'bicycle') osrmProfile = 'bicycle';
         if (travelMode === 'walk') osrmProfile = 'foot';
 
-        const response = await fetch(
-          `https://router.project-osrm.org/route/v1/${osrmProfile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&overview=full&alternatives=true`
-        );
-        const data = await response.json();
-        if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const coordsPath = `${start[0]},${start[1]};${end[0]},${end[1]}`;
+        const servers = [
+          `https://router.project-osrm.org/route/v1/${osrmProfile}/${coordsPath}?geometries=geojson&overview=full&alternatives=true`,
+          `https://routing.openstreetmap.de/${travelMode === 'bicycle' ? 'routed-bike' : travelMode === 'walk' ? 'routed-foot' : 'routed-car'}/route/v1/${osrmProfile}/${coordsPath}?geometries=geojson&overview=full&alternatives=true`
+        ];
+
+        let data = null;
+        for (const url of servers) {
+          try {
+            const response = await fetchWithTimeout(url, { timeout: 5000 });
+            if (response.ok) {
+              data = await response.json();
+              if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+                break;
+              }
+            }
+          } catch (e) {
+            console.warn(`Main OSRM call failed on ${url}:`, e);
+          }
+        }
+
+        if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
           const routesParsed = data.routes.map((r, index) => {
             const distanceKm = (r.distance / 1000).toFixed(1) + ' km';
             
@@ -823,6 +870,7 @@ export default function App() {
           // Supplement routes using real roads if less than 3
           const finalRoutes = await supplementWithRealRoads(routesParsed);
 
+          setIsSimulationMode(false);
           setRouteOptions(finalRoutes);
           setSelectedRouteIndex(0);
           return;
@@ -833,6 +881,7 @@ export default function App() {
 
       // 4. Simulation mode fallback route data with dynamic interpolation
       const mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
+      setIsSimulationMode(true);
       setRouteOptions(mockRoutes);
       setSelectedRouteIndex(0);
     };
@@ -902,6 +951,161 @@ export default function App() {
 
 
   }, [startLocation, destination, settings.mapboxKey, gmapsLoaded, user, travelMode]);
+
+  // Real-time traffic tracking loop (updates every 15 seconds when route is active)
+  useEffect(() => {
+    if (!destination) return;
+
+    const interval = setInterval(async () => {
+      // Get the currently selected route
+      let selectedRoute = null;
+      setRouteOptions(prev => {
+        if (prev && prev[selectedRouteIndex]) {
+          selectedRoute = prev[selectedRouteIndex];
+        }
+        return prev;
+      });
+
+      if (!selectedRoute) return;
+
+      const geom = selectedRoute.geometry;
+      if (!geom || geom.length < 2) return;
+
+      let newStatus;
+      let newDelayInfo = null;
+      let trafficFactor;
+
+      // 1. Try TomTom Live Traffic Flow segments if key is set
+      if (settings.tomtomKey) {
+        try {
+          // Sample 3 points along the route
+          const idxs = [
+            Math.floor(geom.length * 0.15),
+            Math.floor(geom.length * 0.5),
+            Math.floor(geom.length * 0.85)
+          ];
+          
+          let totalRatio = 0;
+          let validPointsCount = 0;
+          let totalDelaySec = 0;
+
+          await Promise.all(
+            idxs.map(async (i) => {
+              const pt = geom[i];
+              if (!pt) return;
+              try {
+                // TomTom Traffic Flow segments API (lat,lng so pt[1],pt[0])
+                const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative-to-functional/10/json?key=${settings.tomtomKey}&point=${pt[1]},${pt[0]}`;
+                const res = await fetchWithTimeout(url, { timeout: 3500 });
+                if (res.ok) {
+                  const data = await res.json();
+                  if (data.flowSegmentData) {
+                    const current = data.flowSegmentData.currentSpeed;
+                    const freeFlow = data.flowSegmentData.freeFlowSpeed;
+                    if (freeFlow > 0) {
+                      totalRatio += current / freeFlow;
+                      validPointsCount++;
+                    }
+                    const travelTime = data.flowSegmentData.currentTravelTime;
+                    const freeFlowTime = data.flowSegmentData.freeFlowTravelTime;
+                    if (travelTime > freeFlowTime) {
+                      totalDelaySec += (travelTime - freeFlowTime);
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('Failed to fetch TomTom traffic flow point:', e);
+              }
+            })
+          );
+
+          if (validPointsCount > 0) {
+            const avgRatio = totalRatio / validPointsCount;
+            // Map to traffic status
+            if (avgRatio >= 0.85) {
+              newStatus = 'smooth';
+              trafficFactor = 1.0;
+            } else if (avgRatio >= 0.55) {
+              newStatus = 'moderate';
+              trafficFactor = 1.25;
+              newDelayInfo = totalDelaySec > 0 
+                ? `${Math.round(totalDelaySec / 60)} min traffic delay`
+                : 'Moderate traffic congestion';
+            } else if (avgRatio >= 0.25) {
+              newStatus = 'heavy';
+              trafficFactor = 1.6;
+              newDelayInfo = totalDelaySec > 0 
+                ? `Heavy delay: +${Math.round(totalDelaySec / 60)} min`
+                : 'Heavy traffic congestion';
+            } else {
+              newStatus = 'blocked';
+              trafficFactor = 2.5;
+              newDelayInfo = 'Road highly congested or blocked';
+            }
+
+            // Successfully fetched traffic
+            updateRouteWithTraffic(newStatus, newDelayInfo, trafficFactor);
+            return;
+          }
+        } catch (e) {
+          console.warn('TomTom live traffic routing failed, using fallback simulation:', e);
+        }
+      }
+
+      // 2. Simulation fallback (runs if key is missing or API failed)
+      // Pick a random traffic update with realistic conditions
+      const roll = Math.random();
+      if (roll < 0.65) {
+        newStatus = 'smooth';
+        newDelayInfo = null;
+        trafficFactor = 1.0;
+      } else if (roll < 0.85) {
+        newStatus = 'moderate';
+        const mins = Math.floor(Math.random() * 5) + 2;
+        newDelayInfo = `${mins} min slow traffic ahead`;
+        trafficFactor = 1.15 + (mins * 0.02);
+      } else if (roll < 0.95) {
+        newStatus = 'heavy';
+        const mins = Math.floor(Math.random() * 12) + 6;
+        newDelayInfo = `Heavy congestion: +${mins} min delay`;
+        trafficFactor = 1.35 + (mins * 0.03);
+      } else {
+        newStatus = 'blocked';
+        newDelayInfo = 'Bottleneck: Road works or accident reported';
+        trafficFactor = 2.1;
+      }
+
+      updateRouteWithTraffic(newStatus, newDelayInfo, trafficFactor);
+
+    }, 15000); // run every 15 seconds
+
+    // Helper to update state reactively
+    const updateRouteWithTraffic = (status, delayInfo, factor) => {
+      setRouteOptions(prev => {
+        if (!prev || !prev[selectedRouteIndex]) return prev;
+        return prev.map((route, idx) => {
+          if (idx !== selectedRouteIndex) return route;
+
+          // Parse base distance (e.g. "12.4 km")
+          const distKm = parseFloat(route.distance.replace(/[^\d.]/g, ''));
+          if (isNaN(distKm)) return route;
+
+          // Recalculate duration using traffic factor
+          const baseSpeed = modeSpeed[travelMode] || 50;
+          const newMins = (distKm / baseSpeed) * 60 * factor;
+
+          return {
+            ...route,
+            trafficStatus: status,
+            delayInfo: delayInfo,
+            duration: fmtDur(newMins)
+          };
+        });
+      });
+    };
+
+    return () => clearInterval(interval);
+  }, [destination, selectedRouteIndex, travelMode, settings.tomtomKey]);
 
 
 
@@ -1005,7 +1209,11 @@ export default function App() {
 
   // Amenities Search Action (spawns POIs on map viewport)
   const handleAmenitiesSearch = (type) => {
-    const center = startLocation?.coordinates || [77.2090, 28.6139]; // Default Delhi center
+    setActiveAmenitySearch({ type, timestamp: Date.now() });
+  };
+
+  const handleAmenitiesSearchFallback = (type, customCenter) => {
+    const center = customCenter || mapCenter || startLocation?.coordinates || [77.2090, 28.6139];
     
     // Generate 4 mock POIs near the map center
     const mockPOIs = {
@@ -1193,6 +1401,7 @@ export default function App() {
         onShareEta={() => setIsShareEtaOpen(true)}
         travelMode={travelMode}
         onTravelModeChange={setTravelMode}
+        isSimulationMode={isSimulationMode}
       />
 
       <MapView
@@ -1216,6 +1425,10 @@ export default function App() {
         }}
         navMarkerPos={navMarkerPos}
         navMarkerBearing={navMarkerBearing}
+        onMapCenterChange={setMapCenter}
+        activeAmenitySearch={activeAmenitySearch}
+        onPoisFound={setPois}
+        onAmenitiesSearchFallback={handleAmenitiesSearchFallback}
       />
 
     </div>
