@@ -64,7 +64,11 @@ const generateDynamicMockRoutes = (start, end, travelMode) => {
   // Helper to generate a realistic winding curve between start and end
   const generateCurvedPath = (p0, p2, offsetDirection = 0) => {
     const points = [];
-    const steps = 30;
+    const distDegrees = Math.sqrt(dLng * dLng + dLat * dLat);
+    
+    // Scale steps and frequency for longer distances to maintain resolution
+    const steps = distDegrees > 0.5 ? 60 : 30;
+    const frequency = distDegrees > 0.5 ? 12 : 6;
     
     const perpLng = -dLat;
     const perpLat = dLng;
@@ -84,11 +88,11 @@ const generateDynamicMockRoutes = (start, end, travelMode) => {
       const lng = uu * p0[0] + 2 * u * t * p1[0] + tt * p2[0];
       const lat = uu * p0[1] + 2 * u * t * p1[1] + tt * p2[1];
       
-      // Add a small sine wave wiggle to look like real winding streets
-      const frequency = 6;
-      const amplitude = 0.006 * Math.sin(t * Math.PI); // zero offset at exactly start & end
-      const waveLng = amplitude * Math.sin(t * Math.PI * frequency);
-      const waveLat = amplitude * Math.cos(t * Math.PI * frequency);
+      // Scale amplitude based on distance to make winding routes visible on all scales
+      const baseAmplitude = Math.max(0.006, distDegrees * 0.05);
+      const currentAmplitude = baseAmplitude * Math.sin(t * Math.PI); // zero offset at exactly start & end
+      const waveLng = currentAmplitude * Math.sin(t * Math.PI * frequency);
+      const waveLat = currentAmplitude * Math.cos(t * Math.PI * frequency);
       
       points.push([lng + waveLng, lat + waveLat]);
     }
@@ -139,12 +143,12 @@ export default function App() {
   // Settings State
   const [settings, setSettings] = useState({
     theme: localStorage.getItem('tf_theme') || 'dark',
-    googleMapsKey: localStorage.getItem('tf_google_maps_key') || '',
-    mapboxKey: localStorage.getItem('tf_mapbox_key') || '',
-    tomtomKey: localStorage.getItem('tf_tomtom_key') || '',
-    openWeatherKey: localStorage.getItem('tf_open_weather_key') || '',
+    googleMapsKey: (localStorage.getItem('tf_google_maps_key') || '').trim(),
+    mapboxKey: (localStorage.getItem('tf_mapbox_key') || '').trim(),
+    tomtomKey: (localStorage.getItem('tf_tomtom_key') || '').trim(),
+    openWeatherKey: (localStorage.getItem('tf_open_weather_key') || '').trim(),
     aiProvider: localStorage.getItem('tf_ai_provider') || 'gemini',
-    aiKey: localStorage.getItem('tf_ai_key') || '',
+    aiKey: (localStorage.getItem('tf_ai_key') || '').trim(),
   });
 
   // Map & Navigation States
@@ -157,6 +161,7 @@ export default function App() {
   const [activeAmenitySearch, setActiveAmenitySearch] = useState(null);
   const [isSimulationMode, setIsSimulationMode] = useState(false);
   const [routingError, setRoutingError] = useState(null);
+  const [activeRoutingEngine, setActiveRoutingEngine] = useState(null); // 'mapbox' | 'osrm' | 'simulation'
 
   // Weather & Time States
   const [weather, setWeather] = useState(localStorage.getItem('tf_weather') || 'clear');
@@ -216,12 +221,12 @@ export default function App() {
         ]);
         setSettings({
           theme: localStorage.getItem('tf_theme') || 'dark',
-          googleMapsKey: localStorage.getItem('tf_google_maps_key') || '',
-          mapboxKey: localStorage.getItem('tf_mapbox_key') || '',
-          tomtomKey: localStorage.getItem('tf_tomtom_key') || '',
-          openWeatherKey: localStorage.getItem('tf_open_weather_key') || '',
+          googleMapsKey: (localStorage.getItem('tf_google_maps_key') || '').trim(),
+          mapboxKey: (localStorage.getItem('tf_mapbox_key') || '').trim(),
+          tomtomKey: (localStorage.getItem('tf_tomtom_key') || '').trim(),
+          openWeatherKey: (localStorage.getItem('tf_open_weather_key') || '').trim(),
           aiProvider: localStorage.getItem('tf_ai_provider') || 'gemini',
-          aiKey: localStorage.getItem('tf_ai_key') || '',
+          aiKey: (localStorage.getItem('tf_ai_key') || '').trim(),
         });
       }, 0);
       return;
@@ -241,24 +246,24 @@ export default function App() {
         } else if (settingsData) {
           setSettings({
             theme: settingsData.theme || 'dark',
-            googleMapsKey: settingsData.google_maps_key || '',
-            mapboxKey: settingsData.mapbox_key || '',
-            tomtomKey: settingsData.tomtom_key || '',
-            openWeatherKey: settingsData.open_weather_key || '',
+            googleMapsKey: (settingsData.google_maps_key || '').trim(),
+            mapboxKey: (settingsData.mapbox_key || '').trim(),
+            tomtomKey: (settingsData.tomtom_key || '').trim(),
+            openWeatherKey: (settingsData.open_weather_key || '').trim(),
             aiProvider: settingsData.ai_provider || 'gemini',
-            aiKey: settingsData.ai_key || '',
+            aiKey: (settingsData.ai_key || '').trim(),
           });
         } else {
           // No settings found, create new default settings row in Supabase
           const defaultSettings = {
             user_id: user.id,
             theme: localStorage.getItem('tf_theme') || 'dark',
-            google_maps_key: localStorage.getItem('tf_google_maps_key') || '',
-            mapbox_key: localStorage.getItem('tf_mapbox_key') || '',
-            tomtom_key: localStorage.getItem('tf_tomtom_key') || '',
-            open_weather_key: localStorage.getItem('tf_open_weather_key') || '',
+            google_maps_key: (localStorage.getItem('tf_google_maps_key') || '').trim(),
+            mapbox_key: (localStorage.getItem('tf_mapbox_key') || '').trim(),
+            tomtom_key: (localStorage.getItem('tf_tomtom_key') || '').trim(),
+            open_weather_key: (localStorage.getItem('tf_open_weather_key') || '').trim(),
             ai_provider: localStorage.getItem('tf_ai_provider') || 'gemini',
-            ai_key: localStorage.getItem('tf_ai_key') || '',
+            ai_key: (localStorage.getItem('tf_ai_key') || '').trim(),
           };
           await supabase.from('user_settings').insert([defaultSettings]);
         }
@@ -414,14 +419,24 @@ export default function App() {
   };
 
   const handleSaveSettings = async (newSettings) => {
-    setSettings(newSettings);
-    localStorage.setItem('tf_theme', newSettings.theme);
-    localStorage.setItem('tf_google_maps_key', newSettings.googleMapsKey || '');
-    localStorage.setItem('tf_mapbox_key', newSettings.mapboxKey);
-    localStorage.setItem('tf_tomtom_key', newSettings.tomtomKey);
-    localStorage.setItem('tf_open_weather_key', newSettings.openWeatherKey || '');
-    localStorage.setItem('tf_ai_provider', newSettings.aiProvider);
-    localStorage.setItem('tf_ai_key', newSettings.aiKey);
+    const trimmedSettings = {
+      theme: newSettings.theme,
+      googleMapsKey: (newSettings.googleMapsKey || '').trim(),
+      mapboxKey: (newSettings.mapboxKey || '').trim(),
+      tomtomKey: (newSettings.tomtomKey || '').trim(),
+      openWeatherKey: (newSettings.openWeatherKey || '').trim(),
+      aiProvider: newSettings.aiProvider,
+      aiKey: (newSettings.aiKey || '').trim(),
+    };
+
+    setSettings(trimmedSettings);
+    localStorage.setItem('tf_theme', trimmedSettings.theme);
+    localStorage.setItem('tf_google_maps_key', trimmedSettings.googleMapsKey);
+    localStorage.setItem('tf_mapbox_key', trimmedSettings.mapboxKey);
+    localStorage.setItem('tf_tomtom_key', trimmedSettings.tomtomKey);
+    localStorage.setItem('tf_open_weather_key', trimmedSettings.openWeatherKey);
+    localStorage.setItem('tf_ai_provider', trimmedSettings.aiProvider);
+    localStorage.setItem('tf_ai_key', trimmedSettings.aiKey);
 
     if (user) {
       try {
@@ -429,13 +444,13 @@ export default function App() {
           .from('user_settings')
           .upsert({
             user_id: user.id,
-            theme: newSettings.theme,
-            google_maps_key: newSettings.googleMapsKey || '',
-            mapbox_key: newSettings.mapboxKey,
-            tomtom_key: newSettings.tomtomKey,
-            open_weather_key: newSettings.openWeatherKey || '',
-            ai_provider: newSettings.aiProvider,
-            ai_key: newSettings.aiKey,
+            theme: trimmedSettings.theme,
+            google_maps_key: trimmedSettings.googleMapsKey,
+            mapbox_key: trimmedSettings.mapboxKey,
+            tomtom_key: trimmedSettings.tomtomKey,
+            open_weather_key: trimmedSettings.openWeatherKey,
+            ai_provider: trimmedSettings.aiProvider,
+            ai_key: trimmedSettings.aiKey,
             updated_at: new Date().toISOString(),
           });
         if (error) console.error('Error saving settings to Supabase:', error);
@@ -705,6 +720,14 @@ export default function App() {
               const routeLabels = ['Fastest Route (Best Recommended)', 'Alternative Route', 'Via City Roads'];
               const routeName = routeLabels[index] || `Route ${index + 1}`;
 
+              // Validate route geometry has enough points if it covers more than 500m
+              const dLng = end[0] - start[0];
+              const dLat = end[1] - start[1];
+              const distDegrees = Math.sqrt(dLng * dLng + dLat * dLat);
+              if (distDegrees > 0.005 && (!r.geometry || !r.geometry.coordinates || r.geometry.coordinates.length < 5)) {
+                throw new Error('Incomplete straight line route segment returned by Mapbox');
+              }
+
               return {
                 name: routeName,
                 distance: distanceKm,
@@ -721,6 +744,7 @@ export default function App() {
 
             setIsSimulationMode(false);
             setRoutingError(null);
+            setActiveRoutingEngine('mapbox');
             setRouteOptions(finalRoutes);
             setSelectedRouteIndex(0);
             return;
@@ -781,6 +805,14 @@ export default function App() {
             const routeLabels = ['Fastest Route (Best Recommended)', 'Alternative Route', 'Via City Roads'];
             const routeName = routeLabels[index] || `Route ${index + 1}`;
 
+            // Validate route geometry has enough points if it covers more than 500m
+            const dLng = end[0] - start[0];
+            const dLat = end[1] - start[1];
+            const distDegrees = Math.sqrt(dLng * dLng + dLat * dLat);
+            if (distDegrees > 0.005 && (!r.geometry || !r.geometry.coordinates || r.geometry.coordinates.length < 5)) {
+              throw new Error('Incomplete straight line route segment returned by OSRM');
+            }
+
             return {
               name: routeName,
               distance: distanceKm,
@@ -801,6 +833,7 @@ export default function App() {
           } else {
             setRoutingError('Using OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.');
           }
+          setActiveRoutingEngine('osrm');
           setRouteOptions(finalRoutes);
           setSelectedRouteIndex(0);
           return;
@@ -817,6 +850,7 @@ export default function App() {
       } else {
         setRoutingError('All routing APIs offline. Simulation mode active.');
       }
+      setActiveRoutingEngine('simulation');
       setRouteOptions(mockRoutes);
       setSelectedRouteIndex(0);
     };
@@ -1355,6 +1389,8 @@ export default function App() {
         activeAmenitySearch={activeAmenitySearch}
         onPoisFound={setPois}
         onAmenitiesSearchFallback={handleAmenitiesSearchFallback}
+        activeRoutingEngine={activeRoutingEngine}
+        routingError={routingError}
       />
 
     </div>

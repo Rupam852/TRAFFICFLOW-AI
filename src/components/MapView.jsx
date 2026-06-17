@@ -89,6 +89,8 @@ export default function MapView({
   activeAmenitySearch,
   onPoisFound,
   onAmenitiesSearchFallback,
+  activeRoutingEngine,
+  routingError,
 }) {
   const mapContainerRef = useRef(null);
   const canvasRef = useRef(null);
@@ -694,6 +696,40 @@ export default function MapView({
           🎯 Recenter Map
         </button>
       )}
+
+      {/* Floating Routing Engine Status Indicator */}
+      {destination && (
+        <div
+          className="glass-panel"
+          style={styles.routingStatusBanner}
+        >
+          <div style={styles.statusRow}>
+            {activeRoutingEngine === 'mapbox' && (
+              <>
+                <span style={{ color: '#10b981', marginRight: '6px' }}>🟢</span>
+                <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>Mapbox Navigation Live</span>
+              </>
+            )}
+            {activeRoutingEngine === 'osrm' && (
+              <>
+                <span style={{ color: '#f59e0b', marginRight: '6px' }}>🟡</span>
+                <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>OpenStreetMap (OSRM) Backup</span>
+              </>
+            )}
+            {activeRoutingEngine === 'simulation' && (
+              <>
+                <span style={{ color: '#ef4444', marginRight: '6px' }}>🔴</span>
+                <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>Simulation Mode Active</span>
+              </>
+            )}
+          </div>
+          {routingError && (
+            <div style={styles.statusErrorText} title={routingError}>
+              {routingError.length > 70 ? routingError.substring(0, 67) + '...' : routingError}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -784,5 +820,39 @@ const styles = {
     background: 'rgba(30,41,59,0.85)',
     color: '#ffffff',
     backdropFilter: 'blur(8px)',
+  },
+  routingStatusBanner: {
+    position: 'absolute',
+    top: '20px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    padding: '10px 18px',
+    borderRadius: '12px',
+    zIndex: 1000,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+    border: '1px solid rgba(255,255,255,0.08)',
+    background: 'rgba(15,23,42,0.85)',
+    color: '#ffffff',
+    backdropFilter: 'blur(12px)',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '3px',
+    maxWidth: '90%',
+    width: 'auto',
+    textAlign: 'center',
+    transition: 'all 0.3s ease',
+  },
+  statusRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '0.8rem',
+  },
+  statusErrorText: {
+    fontSize: '0.7rem',
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: '2px',
+    fontWeight: '500',
   },
 };
