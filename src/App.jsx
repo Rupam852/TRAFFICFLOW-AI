@@ -354,6 +354,19 @@ export default function App() {
     localStorage.setItem('tf_weather', weather);
   }, [weather]);
 
+  // Dynamically control body overflow (scrollability) based on route/session
+  useEffect(() => {
+    if (!user && authMode === 'landing') {
+      document.body.style.overflow = 'auto';
+    } else {
+      document.body.style.overflow = 'hidden';
+      window.scrollTo(0, 0);
+    }
+    return () => {
+      document.body.style.overflow = 'hidden';
+    };
+  }, [user, authMode]);
+
   // Dynamically load Google Maps script globally
   useEffect(() => {
     const oldScript = document.getElementById('google-maps-sdk');
