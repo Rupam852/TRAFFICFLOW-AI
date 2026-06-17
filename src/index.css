@@ -81,6 +81,12 @@
   padding: 0;
 }
 
+html {
+  /* Reserve a stable gutter for scrollbar so content width NEVER shifts
+     when scrollbar appears or disappears — fixes text alignment jumps */
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: var(--bg-primary);
@@ -149,17 +155,22 @@ h1, h2, h3, h4, h5, h6 {
   pointer-events: none;
 }
 
-/* Custom Scrollbars - Hidden by default, transparent, visible on hover */
+/* Custom Scrollbars - Hidden by default, transparent, visible on hover.
+   scrollbar-width: none + scrollbar-gutter: stable on html means the
+   browser reserves the scrollbar slot but renders it invisibly,
+   so content width is always constant — no text alignment shift. */
 * {
-  scrollbar-width: thin;
+  scrollbar-width: none;       /* Firefox: hide scrollbar track completely */
   scrollbar-color: transparent transparent;
-  transition: scrollbar-color 0.3s ease;
 }
 
+/* Show a faint scrollbar only when the element is being hovered */
 *:hover {
+  scrollbar-width: thin;
   scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
 }
 
+/* Webkit (Chrome/Safari/Edge) — hide by default */
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -175,6 +186,7 @@ h1, h2, h3, h4, h5, h6 {
   transition: background 0.3s ease;
 }
 
+/* Show on hover — smooth fade in */
 *:hover::-webkit-scrollbar-thumb {
   background: rgba(148, 163, 184, 0.35);
 }
