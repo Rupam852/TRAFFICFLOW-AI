@@ -186,16 +186,20 @@ const applyTomTomTrafficToRoutes = async (routes, tomtomKey, travelMode) => {
         const midIdx = Math.floor(segment.geometry.length * 0.5);
         const pt = segment.geometry[midIdx];
         
+        let success = false;
+        
         if (hasTomTom && pt) {
           try {
             // Introduce a short delay to prevent QPS limit breach (5 QPS limit)
             await new Promise(resolve => setTimeout(resolve, 150));
 
-            const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?key=${tomtomKey}&point=${pt[1]},${pt[0]}`;
+            const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/18/json?key=${tomtomKey}&point=${pt[1]},${pt[0]}`;
+            console.log(`[TomTom API] Fetching traffic for segment ${sIdx + 1}/${segments.length} at coordinate ${pt[1]},${pt[0]}...`);
             const res = await fetchWithTimeout(url, { timeout: 3000 });
             if (res.ok) {
               const data = await res.json();
               if (data.flowSegmentData) {
+                success = true;
                 const current = data.flowSegmentData.currentSpeed;
                 const freeFlow = data.flowSegmentData.freeFlowSpeed;
                 const travelTime = data.flowSegmentData.currentTravelTime;
@@ -220,16 +224,24 @@ const applyTomTomTrafficToRoutes = async (routes, tomtomKey, travelMode) => {
                 if (statusPriority[status] > statusPriority[worstStatus]) {
                   worstStatus = status;
                 }
+                console.log(`[TomTom API] Segment ${sIdx + 1} status: ${status} (ratio: ${(current / freeFlow).toFixed(2)}, delay: ${Math.round(delaySec)}s)`);
+              } else {
+                console.warn(`[TomTom API] Segment ${sIdx + 1} returned empty flowSegmentData:`, data);
               }
+            } else {
+              console.warn(`[TomTom API] Segment ${sIdx + 1} request failed with HTTP status ${res.status}`);
             }
           } catch (err) {
-            console.warn('Failed to fetch TomTom live traffic segment:', err);
+            console.warn(`[TomTom API] Segment ${sIdx + 1} request error:`, err);
           }
-        } else {
-          // If no TomTom API key or non-vehicular mode, use default mock traffic profiles per segment to look realistic
-          // For example, Route 0: mostly smooth, Route 1: some moderate, Route 2: some heavy/blocked
+        }
+        
+        if (!success) {
+          // If no TomTom API key, non-vehicular mode, or API failed/errored, fall back to mock traffic profiles to look realistic
+          // For example, Route 0: moderate on segment 1, Route 1: moderate on segment 1, Route 2: heavy on segment 2
           let mockStatus = 'smooth';
-          if (rIdx === 1 && sIdx === 1) mockStatus = 'moderate';
+          if (rIdx === 0 && sIdx === 1) mockStatus = 'moderate';
+          else if (rIdx === 1 && sIdx === 1) mockStatus = 'moderate';
           else if (rIdx === 2 && sIdx === 2) mockStatus = 'heavy';
           
           segment.trafficStatus = mockStatus;
@@ -237,6 +249,9 @@ const applyTomTomTrafficToRoutes = async (routes, tomtomKey, travelMode) => {
           const statusPriority = { smooth: 0, moderate: 1, heavy: 2, blocked: 3 };
           if (statusPriority[mockStatus] > statusPriority[worstStatus]) {
             worstStatus = mockStatus;
+          }
+          if (hasTomTom) {
+            console.log(`[Traffic Fallback] Applied mock traffic status '${mockStatus}' to segment ${sIdx + 1} due to TomTom API failure/empty response.`);
           }
         }
       }
@@ -1465,7 +1480,8 @@ export default function App() {
           const pt = geom[midIdx];
 
           if (pt) {
-            const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative-to-functional/10/json?key=${settings.tomtomKey}&point=${pt[1]},${pt[0]}`;
+            const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/18/json?key=${settings.tomtomKey}&point=${pt[1]},${pt[0]}`;
+            console.log(`[TomTom Poller] Fetching traffic for midpoint at coordinate ${pt[1]},${pt[0]}...`);
             const res = await fetchWithTimeout(url, { timeout: 3500 });
             if (res.ok) {
               const data = await res.json();
@@ -1490,10 +1506,15 @@ export default function App() {
                     newStatus = 'blocked'; trafficFactor = 2.5;
                     newDelayInfo = 'Road highly congested or blocked';
                   }
+                  console.log(`[TomTom Poller] Live status: ${newStatus} (ratio: ${(current / freeFlow).toFixed(2)}, delay: ${Math.round(delaySec)}s)`);
                   updateRouteWithTraffic(newStatus, newDelayInfo, trafficFactor);
                   return;
                 }
+              } else {
+                console.warn('[TomTom Poller] Returned empty flowSegmentData:', data);
               }
+            } else {
+              console.warn(`[TomTom Poller] Request failed with HTTP status ${res.status}`);
             }
           }
         } catch (e) {
@@ -1543,11 +1564,26 @@ export default function App() {
           const baseSpeed = modeSpeed[travelMode] || 50;
           const newMins = (distKm / baseSpeed) * 60 * factor;
 
+          // Reactively update segment statuses so they are colored on the map
+          let updatedSegments = route.trafficSegments || [];
+          if (updatedSegments.length > 0) {
+            updatedSegments = updatedSegments.map((seg, sIdx) => {
+              if (status === 'smooth') {
+                return { ...seg, trafficStatus: 'smooth' };
+              } else {
+                // Conjugate: set specific segments as congested to simulate real-time maps
+                const isCongestedSeg = sIdx === 1 || (sIdx === 2 && status === 'heavy');
+                return { ...seg, trafficStatus: isCongestedSeg ? status : 'smooth' };
+              }
+            });
+          }
+
           return {
             ...route,
             trafficStatus: status,
             delayInfo: delayInfo,
-            duration: fmtDur(newMins)
+            duration: fmtDur(newMins),
+            trafficSegments: updatedSegments
           };
         });
       });

@@ -342,7 +342,7 @@ export default function MapView({
               geodesic: true,
               strokeColor: segmentColor,
               strokeOpacity: 1.0,
-              strokeWeight: 3.5, // Thinner line in the middle
+              strokeWeight: 7.0, // Match base route thickness to overlay completely, like Google Maps
               map, zIndex: 30,
             });
             trafficPoly.addListener('click', () => {
@@ -365,7 +365,7 @@ export default function MapView({
             geodesic: true,
             strokeColor: fallbackColor,
             strokeOpacity: 1.0,
-            strokeWeight: 3.5,
+            strokeWeight: 7.0, // Match base route thickness
             map, zIndex: 30,
           });
           trafficPoly.addListener('click', () => {
