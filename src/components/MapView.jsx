@@ -297,75 +297,117 @@ export default function MapView({
     }
 
 
-    // Draw only the selected route — alternatives are shown in the sidebar
+    // Draw all route options on the map (alternatives in gray, selected in blue)
     if (routeOptions && routeOptions.length > 0) {
-      const route = routeOptions[selectedRouteIndex];
-      if (!route) return;
-
       const routeColor = '#3b82f6';
 
-      const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
+      // 1. Draw alternative routes first (so they render underneath the active route)
+      routeOptions.forEach((route, idx) => {
+        if (idx === selectedRouteIndex) return;
 
-      // Dashed connector: start marker → first route point
-      if (startLatLng && pathCoords.length > 0) {
-        const startConnector = new window.google.maps.Polyline({
-          path: [startLatLng, pathCoords[0]],
+        const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
+        if (pathCoords.length === 0) return;
+
+        // Alternative route outline
+        const outlinePoly = new window.google.maps.Polyline({
+          path: pathCoords,
+          geodesic: true,
+          strokeColor: '#ffffff',
+          strokeOpacity: 0.15,
+          strokeWeight: 7,
+          map,
+          zIndex: 5,
+        });
+        polylinesRef.current.push(outlinePoly);
+
+        // Alternative route main line (Gray)
+        const poly = new window.google.maps.Polyline({
+          path: pathCoords,
+          geodesic: true,
+          strokeColor: '#64748b',
+          strokeOpacity: 0.55,
+          strokeWeight: 4,
+          map,
+          zIndex: 6,
+        });
+
+        // Click alternative route line to select it
+        poly.addListener('click', () => {
+          if (onRouteSelectedRef.current) {
+            onRouteSelectedRef.current(idx);
+          }
+        });
+        polylinesRef.current.push(poly);
+      });
+
+      // 2. Draw the selected route on top
+      const route = routeOptions[selectedRouteIndex];
+      if (route) {
+        const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
+
+        // Dashed connector: start marker → first route point
+        if (startLatLng && pathCoords.length > 0) {
+          const startConnector = new window.google.maps.Polyline({
+            path: [startLatLng, pathCoords[0]],
+            geodesic: true,
+            strokeColor: routeColor,
+            strokeOpacity: 0.7,
+            strokeWeight: 2,
+            icons: [{
+              icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+              offset: '0', repeat: '10px',
+            }],
+            map, zIndex: 15,
+          });
+          polylinesRef.current.push(startConnector);
+        }
+
+        // Dashed connector: last route point → destination marker
+        if (pathCoords.length > 0) {
+          const endConnector = new window.google.maps.Polyline({
+            path: [pathCoords[pathCoords.length - 1], endLatLng],
+            geodesic: true,
+            strokeColor: routeColor,
+            strokeOpacity: 0.7,
+            strokeWeight: 2,
+            icons: [{
+              icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
+              offset: '0', repeat: '10px',
+            }],
+            map, zIndex: 15,
+          });
+          polylinesRef.current.push(endConnector);
+        }
+
+        // White outline backdrop
+        const outlinePoly = new window.google.maps.Polyline({
+          path: pathCoords,
+          geodesic: true,
+          strokeColor: '#ffffff',
+          strokeOpacity: 0.6,
+          strokeWeight: 9,
+          map, zIndex: 10,
+        });
+        polylinesRef.current.push(outlinePoly);
+
+        // Main coloured route line (Royal Blue)
+        const poly = new window.google.maps.Polyline({
+          path: pathCoords,
           geodesic: true,
           strokeColor: routeColor,
-          strokeOpacity: 0.7,
-          strokeWeight: 2,
-          icons: [{
-            icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-            offset: '0', repeat: '10px',
-          }],
-          map, zIndex: 15,
+          strokeOpacity: 1.0,
+          strokeWeight: 6,
+          map, zIndex: 20,
         });
-        polylinesRef.current.push(startConnector);
-      }
 
-      // Dashed connector: last route point → destination marker
-      if (pathCoords.length > 0) {
-        const endConnector = new window.google.maps.Polyline({
-          path: [pathCoords[pathCoords.length - 1], endLatLng],
-          geodesic: true,
-          strokeColor: routeColor,
-          strokeOpacity: 0.7,
-          strokeWeight: 2,
-          icons: [{
-            icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-            offset: '0', repeat: '10px',
-          }],
-          map, zIndex: 15,
+        // Click active route
+        poly.addListener('click', () => {
+          if (onRouteSelectedRef.current) {
+            onRouteSelectedRef.current(selectedRouteIndex);
+          }
         });
-        polylinesRef.current.push(endConnector);
+        polylinesRef.current.push(poly);
       }
-
-      // White outline backdrop
-      const outlinePoly = new window.google.maps.Polyline({
-        path: pathCoords,
-        geodesic: true,
-        strokeColor: '#ffffff',
-        strokeOpacity: 0.6,
-        strokeWeight: 9,
-        map, zIndex: 10,
-      });
-      polylinesRef.current.push(outlinePoly);
-
-      // Main coloured route line
-      const poly = new window.google.maps.Polyline({
-        path: pathCoords,
-        geodesic: true,
-        strokeColor: routeColor,
-        strokeOpacity: 1.0,
-        strokeWeight: 6,
-        map, zIndex: 20,
-      });
-
-      // Click any part of the route to open sidebar
-      poly.addListener('click', () => {
-        if (onRouteSelectedRef.current) onRouteSelectedRef.current(selectedRouteIndex);
-      });
-      polylinesRef.current.push(poly);
     }
 
 
