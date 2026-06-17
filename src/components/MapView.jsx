@@ -262,15 +262,14 @@ export default function MapView({
       // Safety: skip if route or geometry is missing/invalid
       if (!route || !route.geometry || route.geometry.length < 2) return;
 
-      let routeColor = '#3b82f6';
-      if (route.trafficStatus === 'smooth') {
-        routeColor = '#10b981';
-      } else if (route.trafficStatus === 'moderate') {
-        routeColor = '#f59e0b';
+      const baseRouteColor = '#3b82f6'; // Royal Blue road color
+      let trafficColor = '#10b981'; // Green (smooth) default
+      if (route.trafficStatus === 'moderate') {
+        trafficColor = '#f59e0b'; // Amber/Orange
       } else if (route.trafficStatus === 'heavy') {
-        routeColor = '#ef4444';
+        trafficColor = '#ef4444'; // Red
       } else if (route.trafficStatus === 'blocked') {
-        routeColor = '#7f1d1d';
+        trafficColor = '#7f1d1d'; // Maroon
       }
 
       const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
@@ -280,7 +279,7 @@ export default function MapView({
         const startConnector = new window.google.maps.Polyline({
           path: [startLatLng, pathCoords[0]],
           geodesic: true,
-          strokeColor: routeColor,
+          strokeColor: baseRouteColor,
           strokeOpacity: 0.7,
           strokeWeight: 2,
           icons: [{
@@ -297,7 +296,7 @@ export default function MapView({
         const endConnector = new window.google.maps.Polyline({
           path: [pathCoords[pathCoords.length - 1], endLatLng],
           geodesic: true,
-          strokeColor: routeColor,
+          strokeColor: baseRouteColor,
           strokeOpacity: 0.7,
           strokeWeight: 2,
           icons: [{
@@ -309,34 +308,48 @@ export default function MapView({
         polylinesRef.current.push(endConnector);
       }
 
-      // White outline backdrop
+      // 1. White outline backdrop (widest)
       const outlinePoly = new window.google.maps.Polyline({
         path: pathCoords,
         geodesic: true,
         strokeColor: '#ffffff',
         strokeOpacity: 0.6,
-        strokeWeight: 9,
+        strokeWeight: 12,
         map, zIndex: 10,
       });
       polylinesRef.current.push(outlinePoly);
 
-      // Main coloured route line (Royal Blue)
-      const poly = new window.google.maps.Polyline({
+      // 2. Base route path (thicker Royal Blue road representation)
+      const baseRoutePoly = new window.google.maps.Polyline({
         path: pathCoords,
         geodesic: true,
-        strokeColor: routeColor,
+        strokeColor: baseRouteColor,
         strokeOpacity: 1.0,
-        strokeWeight: 6,
+        strokeWeight: 7,
         map, zIndex: 20,
       });
-
-      // Click active route to open sidebar
-      poly.addListener('click', () => {
+      baseRoutePoly.addListener('click', () => {
         if (onRouteSelectedRef.current) {
           onRouteSelectedRef.current(selectedRouteIndex);
         }
       });
-      polylinesRef.current.push(poly);
+      polylinesRef.current.push(baseRoutePoly);
+
+      // 3. Inner traffic line (drawn exactly in the middle of the road)
+      const trafficPoly = new window.google.maps.Polyline({
+        path: pathCoords,
+        geodesic: true,
+        strokeColor: trafficColor,
+        strokeOpacity: 1.0,
+        strokeWeight: 3,
+        map, zIndex: 30,
+      });
+      trafficPoly.addListener('click', () => {
+        if (onRouteSelectedRef.current) {
+          onRouteSelectedRef.current(selectedRouteIndex);
+        }
+      });
+      polylinesRef.current.push(trafficPoly);
 
       // Fit map bounds ONLY when destination or route index genuinely changed
       if (shouldFitBounds) {
