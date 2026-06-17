@@ -628,6 +628,9 @@ export default function App() {
 
   // Dynamically load Google Maps script globally
   useEffect(() => {
+    // Wait until both auth state has initialized and user settings have synced from Supabase
+    if (authLoading || isSyncingSettings) return;
+
     // Register Google Maps authentication failure handler
     window.gm_authFailure = () => {
       console.error('Google Maps API Authentication Failed.');
@@ -656,7 +659,7 @@ export default function App() {
     return () => {
       window.gm_authFailure = null;
     };
-  }, [settings.googleMapsKey]);
+  }, [settings.googleMapsKey, authLoading, isSyncingSettings]);
 
   // Retrieve user's current location via HTML5 Geolocation API on mount
   useEffect(() => {
