@@ -873,12 +873,12 @@ export default function MapView({
           <div style={styles.statusRow}>
             {routingError ? (
               <>
-                <span style={{ color: '#ef4444', marginRight: '6px' }}>🔴</span>
-                <span style={{ fontWeight: '700', fontSize: '0.75rem', color: '#ef4444' }}>Offline</span>
+                <span className="status-dot offline" />
+                <span style={{ fontWeight: '700', fontSize: '0.75rem', color: '#f87171' }}>Offline</span>
               </>
             ) : (
               <>
-                <span style={{ color: '#10b981', marginRight: '6px' }}>🟢</span>
+                <span className="status-dot online" />
                 <span style={{ fontWeight: '700', fontSize: '0.75rem', color: 'var(--traffic-smooth)' }}>Online</span>
               </>
             )}
