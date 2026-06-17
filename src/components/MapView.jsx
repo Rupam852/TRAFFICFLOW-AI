@@ -263,14 +263,6 @@ export default function MapView({
       if (!route || !route.geometry || route.geometry.length < 2) return;
 
       const baseRouteColor = '#3b82f6'; // Royal Blue road color
-      let trafficColor = '#10b981'; // Green (smooth) default
-      if (route.trafficStatus === 'moderate') {
-        trafficColor = '#f59e0b'; // Amber/Orange
-      } else if (route.trafficStatus === 'heavy') {
-        trafficColor = '#ef4444'; // Red
-      } else if (route.trafficStatus === 'blocked') {
-        trafficColor = '#7f1d1d'; // Maroon
-      }
 
       const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
 
@@ -335,21 +327,55 @@ export default function MapView({
       });
       polylinesRef.current.push(baseRoutePoly);
 
-      // 3. Inner traffic line (drawn exactly in the middle of the road)
-      const trafficPoly = new window.google.maps.Polyline({
-        path: pathCoords,
-        geodesic: true,
-        strokeColor: trafficColor,
-        strokeOpacity: 1.0,
-        strokeWeight: 3,
-        map, zIndex: 30,
-      });
-      trafficPoly.addListener('click', () => {
-        if (onRouteSelectedRef.current) {
-          onRouteSelectedRef.current(selectedRouteIndex);
+      // 3. Inner traffic lines for specific traffic segments (drawn only where traffic is present)
+      if (route.trafficSegments && route.trafficSegments.length > 0) {
+        route.trafficSegments.forEach((segment) => {
+          // Only draw traffic indicator color if there is actual traffic (not smooth)
+          if (segment.trafficStatus !== 'smooth') {
+            let segmentColor = '#f59e0b'; // moderate
+            if (segment.trafficStatus === 'heavy') segmentColor = '#ef4444';
+            else if (segment.trafficStatus === 'blocked') segmentColor = '#7f1d1d';
+
+            const segmentCoords = segment.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
+            const trafficPoly = new window.google.maps.Polyline({
+              path: segmentCoords,
+              geodesic: true,
+              strokeColor: segmentColor,
+              strokeOpacity: 1.0,
+              strokeWeight: 3.5, // Thinner line in the middle
+              map, zIndex: 30,
+            });
+            trafficPoly.addListener('click', () => {
+              if (onRouteSelectedRef.current) {
+                onRouteSelectedRef.current(selectedRouteIndex);
+              }
+            });
+            polylinesRef.current.push(trafficPoly);
+          }
+        });
+      } else {
+        // Fallback: if trafficSegments is missing, draw a single traffic line in the middle if it's not smooth
+        if (route.trafficStatus !== 'smooth') {
+          let fallbackColor = '#f59e0b'; // moderate
+          if (route.trafficStatus === 'heavy') fallbackColor = '#ef4444';
+          else if (route.trafficStatus === 'blocked') fallbackColor = '#7f1d1d';
+
+          const trafficPoly = new window.google.maps.Polyline({
+            path: pathCoords,
+            geodesic: true,
+            strokeColor: fallbackColor,
+            strokeOpacity: 1.0,
+            strokeWeight: 3.5,
+            map, zIndex: 30,
+          });
+          trafficPoly.addListener('click', () => {
+            if (onRouteSelectedRef.current) {
+              onRouteSelectedRef.current(selectedRouteIndex);
+            }
+          });
+          polylinesRef.current.push(trafficPoly);
         }
-      });
-      polylinesRef.current.push(trafficPoly);
+      }
 
       // Fit map bounds ONLY when destination or route index genuinely changed
       if (shouldFitBounds) {
