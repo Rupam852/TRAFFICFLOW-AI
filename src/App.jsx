@@ -151,7 +151,7 @@ const applyTomTomTrafficToRoutes = async (routes, tomtomKey, travelMode) => {
           const pt = geom[midIdx];
           if (!pt) return route;
 
-          const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/relative-to-functional/10/json?key=${tomtomKey}&point=${pt[1]},${pt[0]}`;
+          const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?key=${tomtomKey}&point=${pt[1]},${pt[0]}`;
           const res = await fetchWithTimeout(url, { timeout: 3500 });
           if (res.ok) {
             const data = await res.json();
