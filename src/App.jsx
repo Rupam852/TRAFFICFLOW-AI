@@ -173,6 +173,8 @@ export default function App() {
   // Live GPS tracking states (marker position & orientation)
   const [navMarkerPos, setNavMarkerPos] = useState(null); // [lng, lat] of moving navigator dot
   const [navMarkerBearing, setNavMarkerBearing] = useState(null); // heading angle in degrees (0-360)
+  const [hasArrived, setHasArrived] = useState(false);       // true when user is near destination
+  const [showArrivalToast, setShowArrivalToast] = useState(false); // controls arrival toast visibility
   const lastSearchedDestNameRef = useRef(null);
 
   // Bookmarks & Search History States
@@ -386,6 +388,16 @@ export default function App() {
     }
   }, []);
 
+  // Haversine distance in metres between two [lng, lat] points
+  const haversineMetres = (a, b) => {
+    const R = 6371000;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(b[1] - a[1]);
+    const dLng = toRad(b[0] - a[0]);
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(a[1])) * Math.cos(toRad(b[1])) * Math.sin(dLng / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  };
+
   // Live GPS tracking watcher to move the navigator dot and follow user's position
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -397,6 +409,23 @@ export default function App() {
         if (heading !== null && heading !== undefined) {
           setNavMarkerBearing(heading);
         }
+
+        // Arrival detection: within 300 m of destination
+        setDestination(prevDest => {
+          if (prevDest?.coordinates) {
+            const dist = haversineMetres([longitude, latitude], prevDest.coordinates);
+            if (dist <= 300) {
+              setHasArrived(prev => {
+                if (!prev) {
+                  setShowArrivalToast(true);
+                  setTimeout(() => setShowArrivalToast(false), 7000);
+                }
+                return true;
+              });
+            }
+          }
+          return prevDest;
+        });
       },
       (err) => console.warn('GPS watch error:', err),
       { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 }
@@ -1182,6 +1211,20 @@ export default function App() {
     if (idx === selectedRouteIndex) return;
     setIsRouteSwitching(true);
     setSelectedRouteIndex(idx);
+    setHasArrived(false); // reset arrival on new route selection
+
+    // After route switches, zoom map to user's current GPS position
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { longitude, latitude } = pos.coords;
+          setNavMarkerPos([longitude, latitude]);
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 4000 }
+      );
+    }
+
     setTimeout(() => {
       setIsRouteSwitching(false);
     }, 450);
@@ -1221,6 +1264,54 @@ export default function App() {
         destination={destination}
         selectedRoute={routeOptions[selectedRouteIndex]}
       />
+
+      {/* ─── Arrival Toast Notification ─── */}
+      {showArrivalToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '32px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+          color: '#ffffff',
+          padding: '18px 28px',
+          borderRadius: '20px',
+          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '14px',
+          animation: 'fadeIn 0.4s ease',
+          maxWidth: '90vw',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.2)',
+        }}>
+          <span style={{ fontSize: '2rem' }}>🎉</span>
+          <div>
+            <div style={{ fontWeight: '800', fontSize: '1rem', letterSpacing: '-0.01em' }}>
+              You've Arrived!
+            </div>
+            <div style={{ fontSize: '0.8rem', opacity: 0.9, marginTop: '2px' }}>
+              {destination?.name || 'Destination'} reached successfully
+            </div>
+          </div>
+          <button
+            onClick={() => setShowArrivalToast(false)}
+            style={{
+              background: 'rgba(255,255,255,0.2)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '28px', height: '28px',
+              color: '#fff',
+              fontWeight: '700',
+              fontSize: '1rem',
+              cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              marginLeft: '4px',
+            }}
+          >✕</button>
+        </div>
+      )}
 
       {/* First-Login Keys Disclaimer Alert Dialog */}
       {showWarningOnLogin && (

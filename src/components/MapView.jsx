@@ -400,7 +400,7 @@ export default function MapView({
     const markerIcon = {
       path: hasBearing ? window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW : window.google.maps.SymbolPath.CIRCLE,
       scale: hasBearing ? 8 : 10,
-      fillColor: '#3b82f6', // Professional Royal Blue for navigator
+      fillColor: '#3b82f6',
       fillOpacity: 1,
       strokeColor: '#ffffff',
       strokeWeight: 2.5,
@@ -415,6 +415,8 @@ export default function MapView({
         icon: markerIcon,
         zIndex: 999,
       });
+      // First time GPS arrives: zoom to user location at street level
+      mapRef.current.panTo(latlng);
       mapRef.current.setZoom(16);
       setAutoFollow(true);
     } else {
