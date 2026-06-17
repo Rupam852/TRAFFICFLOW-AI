@@ -628,52 +628,54 @@ export default function App() {
       };
 
       // Helper to fill missing alternative routes with real roads from OSRM
+      // Falls back to guaranteed-distinct mock geometry if OSRM returns null
       const supplementWithRealRoads = async (routesList) => {
         let finalRoutes = [...routesList];
-        if (finalRoutes.length < 3) {
-          if (finalRoutes.length === 0) {
-            const mockAlternatives = generateDynamicMockRoutes(start, end, travelMode);
-            finalRoutes = mockAlternatives;
-          } else if (finalRoutes.length === 1) {
-            const geom1 = await fetchOSRMRouteGeometry(1, 1.2);  // moderate traffic +20%
-            if (geom1) {
-              finalRoutes.push({
-                name: 'Alternative Route',
-                distance: geom1.distance,
-                duration: geom1.duration,
-                geometry: geom1.geometry,
-                trafficStatus: 'moderate',
-                delayInfo: 'Moderate traffic expected',
-                isRecommended: false
-              });
-            }
-            const geom2 = await fetchOSRMRouteGeometry(-1, 1.4);  // heavy traffic +40%
-            if (geom2) {
-              finalRoutes.push({
-                name: 'Via City Roads',
-                distance: geom2.distance,
-                duration: geom2.duration,
-                geometry: geom2.geometry,
-                trafficStatus: 'heavy',
-                delayInfo: 'Heavy urban traffic',
-                isRecommended: false
-              });
-            }
-          } else if (finalRoutes.length === 2) {
-            const geom1 = await fetchOSRMRouteGeometry(1, 1.4);
-            if (geom1) {
-              finalRoutes.push({
-                name: 'Via City Roads',
-                distance: geom1.distance,
-                duration: geom1.duration,
-                geometry: geom1.geometry,
-                trafficStatus: 'heavy',
-                delayInfo: 'Heavy urban traffic',
-                isRecommended: false
-              });
-            }
-          }
+        // Pre-generate mock routes as geometry fallbacks (always distinct curves)
+        const mockFallbacks = generateDynamicMockRoutes(start, end, travelMode);
+
+        if (finalRoutes.length === 0) {
+          return mockFallbacks;
         }
+
+        if (finalRoutes.length === 1) {
+          // Route 2: Try OSRM, fallback to mock curve (offset +0.35)
+          const geom1 = await fetchOSRMRouteGeometry(1, 1.2);
+          finalRoutes.push({
+            name: 'Alternative Route',
+            distance: geom1?.distance ?? mockFallbacks[1].distance,
+            duration: geom1?.duration ?? mockFallbacks[1].duration,
+            geometry: geom1?.geometry ?? mockFallbacks[1].geometry,
+            trafficStatus: 'moderate',
+            delayInfo: 'Moderate traffic expected',
+            isRecommended: false
+          });
+
+          // Route 3: Try OSRM, fallback to mock curve (offset -0.25)
+          const geom2 = await fetchOSRMRouteGeometry(-1, 1.4);
+          finalRoutes.push({
+            name: 'Via City Roads',
+            distance: geom2?.distance ?? mockFallbacks[2].distance,
+            duration: geom2?.duration ?? mockFallbacks[2].duration,
+            geometry: geom2?.geometry ?? mockFallbacks[2].geometry,
+            trafficStatus: 'heavy',
+            delayInfo: 'Heavy urban traffic',
+            isRecommended: false
+          });
+        } else if (finalRoutes.length === 2) {
+          // Route 3: Try OSRM, fallback to mock curve
+          const geom1 = await fetchOSRMRouteGeometry(1, 1.4);
+          finalRoutes.push({
+            name: 'Via City Roads',
+            distance: geom1?.distance ?? mockFallbacks[2].distance,
+            duration: geom1?.duration ?? mockFallbacks[2].duration,
+            geometry: geom1?.geometry ?? mockFallbacks[2].geometry,
+            trafficStatus: 'heavy',
+            delayInfo: 'Heavy urban traffic',
+            isRecommended: false
+          });
+        }
+
         return finalRoutes;
       };
 

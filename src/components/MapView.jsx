@@ -303,7 +303,8 @@ export default function MapView({
     if (routeOptions && routeOptions.length > 0) {
       const routeColor = '#3b82f6';
       const route = routeOptions[selectedRouteIndex];
-      if (!route) return;
+      // Safety: skip if route or geometry is missing/invalid
+      if (!route || !route.geometry || route.geometry.length < 2) return;
 
       const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
 
@@ -369,9 +370,14 @@ export default function MapView({
         }
       });
       polylinesRef.current.push(poly);
+
+      // Fit map bounds to show the full selected route
+      const bounds = new window.google.maps.LatLngBounds();
+      pathCoords.forEach(pt => bounds.extend(pt));
+      if (startLatLng) bounds.extend(startLatLng);
+      if (endLatLng) bounds.extend(endLatLng);
+      map.fitBounds(bounds, { top: 80, right: 40, bottom: 80, left: 40 });
     }
-
-
 
   }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois]);
 
