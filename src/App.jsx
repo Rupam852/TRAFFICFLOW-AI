@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
 import { Menu, X, Map } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
+import { evaluateRouteSelectionWithAI } from './utils/ai';
 
 // Speed (km/h) per travel mode — used for mock route duration estimation
 const modeSpeed = { car: 50, motorbike: 65, bicycle: 18, walk: 5 };
@@ -1108,6 +1109,43 @@ export default function App() {
         return result;
       };
 
+      const processAndSetRoutes = async (rawRoutes, isSim, errorMsg, engineName) => {
+        // Fetch live TomTom traffic for the routes immediately
+        let finalRoutes = await applyTomTomTrafficToRoutes(rawRoutes, settings.tomtomKey, travelMode);
+
+        // Let AI decide the route recommendation!
+        try {
+          const aiDecision = await evaluateRouteSelectionWithAI({
+            provider: settings.aiProvider,
+            apiKey: settings.aiKey,
+            startLocation,
+            destination,
+            routeOptions: finalRoutes,
+            weatherCondition: localStorage.getItem('tf_weather') || 'clear',
+            travelMode
+          });
+
+          // Apply AI selection to routes
+          finalRoutes = finalRoutes.map((route, index) => ({
+            ...route,
+            isAiRecommended: index === aiDecision.recommendedIndex,
+            aiReason: index === aiDecision.recommendedIndex ? aiDecision.reason : null,
+            isRecommended: index === aiDecision.recommendedIndex
+          }));
+        } catch (aiErr) {
+          console.warn("AI route evaluation failed:", aiErr);
+        }
+
+        setIsSimulationMode(isSim);
+        setRoutingError(errorMsg);
+        setActiveRoutingEngine(engineName);
+        setRouteOptions(finalRoutes);
+        
+        // Default select the AI recommended route index
+        const recIdx = finalRoutes.findIndex(r => r.isRecommended);
+        setSelectedRouteIndex(recIdx !== -1 ? recIdx : 0);
+      };
+
       // Helper to fetch a real road route geometry from OSRM (with retry/fallback and timeout)
       const fetchOSRMRouteGeometry = async (offsetDirection = 0, trafficMultiplier = 1) => {
         let osrmProfile = 'driving';
@@ -1265,16 +1303,8 @@ export default function App() {
             });
 
             // Supplement routes using real roads if less than 3
-            let finalRoutes = await supplementWithRealRoads(routesParsed);
-
-            // Fetch live TomTom traffic for the routes immediately
-            finalRoutes = await applyTomTomTrafficToRoutes(finalRoutes, settings.tomtomKey, travelMode);
-
-            setIsSimulationMode(false);
-            setRoutingError(null);
-            setActiveRoutingEngine('mapbox');
-            setRouteOptions(finalRoutes);
-            setSelectedRouteIndex(0);
+            const finalRoutes = await supplementWithRealRoads(routesParsed);
+            await processAndSetRoutes(finalRoutes, false, null, 'mapbox');
             return;
           }
         } catch (error) {
@@ -1353,20 +1383,15 @@ export default function App() {
           });
 
           // Supplement routes using real roads if less than 3
-          let finalRoutes = await supplementWithRealRoads(routesParsed);
-
-          // Fetch live TomTom traffic for the routes immediately
-          finalRoutes = await applyTomTomTrafficToRoutes(finalRoutes, settings.tomtomKey, travelMode);
-
-          setIsSimulationMode(false);
-          if (mapboxErrorMsg) {
-            setRoutingError(`Mapbox API failed (${mapboxErrorMsg}). Falling back to OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.`);
-          } else {
-            setRoutingError('Using OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.');
-          }
-          setActiveRoutingEngine('osrm');
-          setRouteOptions(finalRoutes);
-          setSelectedRouteIndex(0);
+          const finalRoutes = await supplementWithRealRoads(routesParsed);
+          await processAndSetRoutes(
+            finalRoutes,
+            false,
+            mapboxErrorMsg
+              ? `Mapbox API failed (${mapboxErrorMsg}). Falling back to OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.`
+              : 'Using OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.',
+            'osrm'
+          );
           return;
         }
       } catch (error) {
@@ -1374,20 +1399,15 @@ export default function App() {
       }
 
       // 3. Simulation mode fallback route data with dynamic interpolation
-      let mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
-
-      // Fetch live TomTom traffic for the routes immediately
-      mockRoutes = await applyTomTomTrafficToRoutes(mockRoutes, settings.tomtomKey, travelMode);
-
-      setIsSimulationMode(true);
-      if (mapboxErrorMsg) {
-        setRoutingError(`Mapbox API failed (${mapboxErrorMsg}). All backup routing APIs are offline. Simulation mode active.`);
-      } else {
-        setRoutingError('All routing APIs offline. Simulation mode active.');
-      }
-      setActiveRoutingEngine('simulation');
-      setRouteOptions(mockRoutes);
-      setSelectedRouteIndex(0);
+      const mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
+      await processAndSetRoutes(
+        mockRoutes,
+        true,
+        mapboxErrorMsg
+          ? `Mapbox API failed (${mapboxErrorMsg}). All backup routing APIs are offline. Simulation mode active.`
+          : 'All routing APIs offline. Simulation mode active.',
+        'simulation'
+      );
       } finally {
         setIsRoutesLoading(false);
       }
@@ -1457,7 +1477,7 @@ export default function App() {
     }
 
 
-  }, [startLocation, destination, settings.mapboxKey, settings.tomtomKey, gmapsLoaded, user, travelMode]);
+  }, [startLocation, destination, settings.mapboxKey, settings.tomtomKey, settings.aiProvider, settings.aiKey, gmapsLoaded, user, travelMode]);
 
   // Real-time traffic tracking loop (updates every 15 seconds when route is active)
   useEffect(() => {

@@ -698,9 +698,21 @@ const Sidebar = forwardRef(function Sidebar({
                             <div style={styles.routeHeader}>
                               <span style={styles.routeName}>{route.name}</span>
                               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                {route.isRecommended && (
+                                {route.isAiRecommended ? (
+                                  <span style={{
+                                    fontSize: '0.62rem',
+                                    fontWeight: '800',
+                                    color: '#ffffff',
+                                    backgroundColor: '#8b5cf6',
+                                    backgroundImage: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    letterSpacing: '0.04em',
+                                    boxShadow: '0 0 6px rgba(168, 85, 247, 0.4)'
+                                  }}>🧠 AI SELECTED</span>
+                                ) : route.isRecommended ? (
                                   <span style={styles.recommendedBadge}>RECOMMENDED</span>
-                                )}
+                                ) : null}
                                  {isSelected && (
                                   <span style={{
                                     fontSize: '0.62rem',
@@ -737,6 +749,21 @@ const Sidebar = forwardRef(function Sidebar({
                             </div>
                             {route.delayInfo && (
                               <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
+                            )}
+                            {route.aiReason && (
+                              <div style={{
+                                marginTop: '8px',
+                                fontSize: '0.74rem',
+                                color: 'var(--text-secondary)',
+                                backgroundColor: 'rgba(139, 92, 246, 0.08)',
+                                borderLeft: '3px solid #8b5cf6',
+                                padding: '6px 10px',
+                                borderRadius: '4px',
+                                fontWeight: '500',
+                                lineHeight: '1.4'
+                              }}>
+                                🧠 <strong>AI Analysis:</strong> {route.aiReason}
+                              </div>
                             )}
                           </div>
                         );

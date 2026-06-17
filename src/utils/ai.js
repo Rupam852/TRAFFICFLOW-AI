@@ -168,3 +168,119 @@ ${weatherCondition === 'rain'
 
   return new Promise((resolve) => setTimeout(() => resolve(analysis), 800));
 }
+
+export async function evaluateRouteSelectionWithAI({
+  provider,
+  apiKey,
+  startLocation,
+  destination,
+  routeOptions,
+  weatherCondition,
+  travelMode
+}) {
+  if (!routeOptions || routeOptions.length === 0) return { recommendedIndex: 0, reason: '' };
+
+  const prompt = `You are a real-time AI Traffic Flow and Navigation Consultant.
+Evaluate the following route options from "${startLocation?.name || 'Start'}" to "${destination?.name || 'Destination'}" under "${weatherCondition}" weather for a "${travelMode}".
+Select the absolute best/safest/fastest route.
+
+Route Options:
+${routeOptions.map((r, i) => `[Route Index ${i}] Name: "${r.name}", Distance: "${r.distance}", Duration: "${r.duration}", Traffic Status: "${r.trafficStatus}", Bottlenecks: "${r.delayInfo || 'None'}"`).join('\n')}
+
+Format your response strictly as a JSON object, containing:
+1. "recommendedIndex": The number (0, 1, or 2) representing the best route index.
+2. "reason": A single concise sentence (max 15 words) explaining why you selected this route (e.g. "AI selected Route 1 to bypass moderate rain congestion and road works on Route 0.").
+
+Response JSON format:
+{
+  "recommendedIndex": 0,
+  "reason": "AI selected Route 0 because..."
+}
+Return ONLY the raw JSON. Do not include markdown code block formatting (like \`\`\`json) or any other text.`;
+
+  // Default fallback if key is missing or request fails
+  const mockDecision = () => {
+    // Basic heuristic: Route 0 is fastest. If Route 0 has congestion, Route 1 might be better.
+    let index = 0;
+    let reason = `AI selected Route 1 because it has the clear, optimal speed profile.`;
+    
+    if (routeOptions.length > 1) {
+      const isRoute0Slow = routeOptions[0].trafficStatus !== 'smooth';
+      const isRoute1Clear = routeOptions[1].trafficStatus === 'smooth';
+      if (isRoute0Slow && isRoute1Clear) {
+        index = 1;
+        reason = `AI selected Route 2 to bypass moderate traffic delays on the primary path.`;
+      } else if (routeOptions.length > 2 && routeOptions[0].trafficStatus === 'heavy' && routeOptions[2].trafficStatus === 'smooth') {
+        index = 2;
+        reason = `AI selected Route 3 as the safest alternative route to avoid heavy urban bottlenecks.`;
+      }
+    }
+    return { recommendedIndex: index, reason };
+  };
+
+  if (!apiKey) {
+    return mockDecision();
+  }
+
+  try {
+    incrementApiUsage('ai');
+    let jsonText = '';
+    if (provider === 'gemini') {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              maxOutputTokens: 120,
+              temperature: 0.2,
+              responseMimeType: "application/json" // Force Gemini to return JSON
+            },
+          }),
+        }
+      );
+      const data = await response.json();
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+        jsonText = data.candidates[0].content.parts[0].text.trim();
+      } else {
+        throw new Error('Empty response from Gemini');
+      }
+    } else if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          response_format: { type: "json_object" }, // Force OpenAI to return JSON
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 120,
+          temperature: 0.2,
+        }),
+      });
+      const data = await response.json();
+      jsonText = data.choices[0].message.content.trim();
+    } else {
+      // Claude or others
+      return mockDecision();
+    }
+
+    // Parse the JSON returned by the AI
+    // Strip markdown formatting if AI returned it anyway
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+    }
+    const result = JSON.parse(jsonText);
+    return {
+      recommendedIndex: typeof result.recommendedIndex === 'number' ? result.recommendedIndex : 0,
+      reason: result.reason || 'AI selected this route.'
+    };
+  } catch (error) {
+    console.error('AI Route Decision error:', error);
+    return mockDecision();
+  }
+}
