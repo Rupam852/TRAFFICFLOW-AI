@@ -793,7 +793,17 @@ export default function App() {
     };
 
     const oldScript = document.getElementById('google-maps-sdk');
+    const keyParam = `key=${settings.googleMapsKey || ''}`;
+
     if (oldScript) {
+      const currentSrc = oldScript.getAttribute('src') || '';
+      if (currentSrc.includes(keyParam) && window.google && window.google.maps) {
+        // Already loaded with the same key, do not reload
+        setTimeout(() => setGmapsLoaded(true), 0);
+        return;
+      }
+
+      // Key changed or google namespace missing, reload script
       oldScript.remove();
       if (window.google) {
         delete window.google;
@@ -804,7 +814,7 @@ export default function App() {
     const script = document.createElement('script');
     script.id = 'google-maps-sdk';
     // Load keyless by default for public usage, or use key if provided in settings
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${settings.googleMapsKey || ''}&libraries=places&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?${keyParam}&libraries=places&v=weekly`;
     script.async = true;
     script.defer = true;
     script.onload = () => setGmapsLoaded(true);
