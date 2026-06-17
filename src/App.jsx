@@ -192,15 +192,7 @@ export default function App() {
     navMarkerPosRef.current = navMarkerPos;
   }, [navMarkerPos]);
 
-  // Bookmarks & Search History States
-  const [bookmarks, setBookmarks] = useState(() => {
-    const saved = localStorage.getItem('tf_bookmarks');
-    return saved ? JSON.parse(saved) : [];
-  });
 
-  useEffect(() => {
-    localStorage.setItem('tf_bookmarks', JSON.stringify(bookmarks));
-  }, [bookmarks]);
 
   const [searchHistory, setSearchHistory] = useState([
     { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
@@ -230,10 +222,7 @@ export default function App() {
   // Sync user database state on auth state changes
   useEffect(() => {
     if (!user) {
-      // Clear or reset to local storage defaults
-      const savedBm = localStorage.getItem('tf_bookmarks');
       setTimeout(() => {
-        setBookmarks(savedBm ? JSON.parse(savedBm) : []);
         setSearchHistory([
           { name: 'Cyber City, Gurugram', coordinates: [77.0878, 28.4950] },
           { name: 'India Gate, Delhi', coordinates: [77.2295, 28.6129] },
@@ -287,26 +276,7 @@ export default function App() {
           await supabase.from('user_settings').insert([defaultSettings]);
         }
 
-        // 2. Fetch bookmarks
-        const { data: bookmarksData, error: bookmarksError } = await supabase
-          .from('bookmarks')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: true });
-
-        if (bookmarksError) {
-          console.error('Error fetching bookmarks:', bookmarksError);
-        } else if (bookmarksData) {
-          const parsedBookmarks = bookmarksData.map(bm => ({
-            id: bm.id,
-            name: bm.name,
-            address: bm.address,
-            coordinates: Array.isArray(bm.coordinates) ? bm.coordinates : JSON.parse(bm.coordinates)
-          }));
-          setBookmarks(parsedBookmarks);
-        }
-
-        // 3. Fetch search history
+        // 2. Fetch search history
         const { data: historyData, error: historyError } = await supabase
           .from('search_history')
           .select('*')
@@ -1094,73 +1064,7 @@ export default function App() {
 
 
 
-  // Bookmarks Actions
-  const handleAddBookmark = async (newBm) => {
-    if (user) {
-      try {
-        const { data, error } = await supabase
-          .from('bookmarks')
-          .insert([
-            {
-              user_id: user.id,
-              name: newBm.name,
-              address: newBm.address,
-              coordinates: newBm.coordinates,
-            }
-          ])
-          .select();
-        
-        if (error) {
-          console.error('Error adding bookmark to Supabase:', error);
-          return;
-        }
 
-        if (data && data[0]) {
-          const inserted = {
-            id: data[0].id,
-            name: data[0].name,
-            address: data[0].address,
-            coordinates: data[0].coordinates
-          };
-          setBookmarks(prev => [...prev, inserted]);
-        }
-      } catch (err) {
-        console.error('Failed to save bookmark to Supabase:', err);
-      }
-    } else {
-      setBookmarks(prev => [...prev, newBm]);
-    }
-  };
-
-  const handleSelectBookmark = (bm) => {
-    stopRouteSimulation();
-    setDestination({ name: bm.address, coordinates: bm.coordinates });
-    if (window.innerWidth <= 640) {
-      setIsSidebarOpen(false);
-    }
-  };
-
-  const handleRemoveBookmark = async (indexToRemove) => {
-    const bmToRemove = bookmarks[indexToRemove];
-    if (user && bmToRemove.id) {
-      try {
-        const { error } = await supabase
-          .from('bookmarks')
-          .delete()
-          .eq('id', bmToRemove.id);
-        
-        if (error) {
-          console.error('Error deleting bookmark from Supabase:', error);
-          return;
-        }
-        setBookmarks(prev => prev.filter((_, idx) => idx !== indexToRemove));
-      } catch (err) {
-        console.error('Failed to delete bookmark from Supabase:', err);
-      }
-    } else {
-      setBookmarks(prev => prev.filter((_, idx) => idx !== indexToRemove));
-    }
-  };
 
   // Search History Action
   const handleSelectHistory = (item) => {
@@ -1504,10 +1408,6 @@ export default function App() {
         onRouteSelected={handleRouteSelected}
         isRoutesLoading={isRoutesLoading}
         isRouteSwitching={isRouteSwitching}
-        bookmarks={bookmarks}
-        onAddBookmark={handleAddBookmark}
-        onSelectBookmark={handleSelectBookmark}
-        onRemoveBookmark={handleRemoveBookmark}
         searchHistory={searchHistory}
         onSelectHistory={handleSelectHistory}
         onRemoveHistory={handleRemoveHistory}
