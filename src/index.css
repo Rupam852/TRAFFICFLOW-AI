@@ -151,7 +151,7 @@ h1, h2, h3, h4, h5, h6 {
 
 /* ─── Scrollbars: Show on Scroll, Fade Out when Idle ──────────────────────────
    Strategy:
-   • Scrollbars are 6px wide but transparent by default (no track/thumb visible).
+   • Scrollbars are 3px wide but transparent by default (no track/thumb visible).
    • When scrolling occurs, JavaScript adds the '.is-scrolling' class.
    • The thumb fades in (background becomes semi-transparent grey) with transition.
    • When scrolling stops, the '.is-scrolling' class is removed and the thumb fades out.
@@ -168,8 +168,8 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Webkit (Chrome / Edge / Safari) */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 3px;
+  height: 3px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
