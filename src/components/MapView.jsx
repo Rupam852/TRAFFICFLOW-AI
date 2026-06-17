@@ -105,6 +105,20 @@ export default function MapView({
   const [gmapsError, setGmapsError] = useState(false);
   const [autoFollow, setAutoFollow] = useState(true);
   const [isWeatherPanelOpen, setIsWeatherPanelOpen] = useState(false);
+  const [isNetworkOnline, setIsNetworkOnline] = useState(navigator.onLine);
+
+  useEffect(() => {
+    const handleOnline = () => setIsNetworkOnline(true);
+    const handleOffline = () => setIsNetworkOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Refs to track map boundary updates and avoid jumping zoom loops
   const hasFittedBoundsRef = useRef(false);
@@ -871,7 +885,7 @@ export default function MapView({
           style={styles.routingStatusBanner}
         >
           <div style={styles.statusRow}>
-            {routingError ? (
+            {(!isNetworkOnline || routingError) ? (
               <>
                 <span className="status-dot offline" />
                 <span style={{ fontWeight: '700', fontSize: '0.75rem', color: '#f87171' }}>Offline</span>
@@ -883,9 +897,11 @@ export default function MapView({
               </>
             )}
           </div>
-          {routingError && (
-            <div style={styles.statusErrorText} title={routingError}>
-              {routingError.length > 50 ? routingError.substring(0, 47) + '...' : routingError}
+          {(!isNetworkOnline || routingError) && (
+            <div style={styles.statusErrorText} title={routingError || "Network offline"}>
+              {routingError 
+                ? (routingError.length > 50 ? routingError.substring(0, 47) + '...' : routingError)
+                : "Network offline"}
             </div>
           )}
         </div>
