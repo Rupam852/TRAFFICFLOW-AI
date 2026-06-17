@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Mail, Lock, ShieldAlert, ArrowRight, Navigation, Loader2, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, ShieldAlert, ArrowRight, Navigation, Loader2, ArrowLeft, Activity, Cpu } from 'lucide-react';
 
 export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToLanding, onToggleMode }) {
   const [email, setEmail] = useState('');
@@ -85,24 +85,21 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
           <p style={styles.tagline}>Navigate smarter, beat the rush, and experience the future of real-time route optimization.</p>
           <div style={styles.featuresList}>
             <div style={styles.featureItem}>
-              <div style={styles.featureDot}>🚦</div>
+              <div style={styles.featureIconWrapper}>
+                <Activity size={20} />
+              </div>
               <div>
                 <h4 style={styles.featureTitle}>Dynamic Traffic Analysis</h4>
                 <p style={styles.featureDesc}>Color-coded traffic updates with TomTom live telemetry integration.</p>
               </div>
             </div>
             <div style={styles.featureItem}>
-              <div style={styles.featureDot}>🤖</div>
+              <div style={styles.featureIconWrapper}>
+                <Cpu size={20} />
+              </div>
               <div>
                 <h4 style={styles.featureTitle}>AI Route Optimizers</h4>
                 <p style={styles.featureDesc}>Harness Google, OpenAI, or Claude models for smart route recommendations.</p>
-              </div>
-            </div>
-            <div style={styles.featureItem}>
-              <div style={styles.featureDot}>🌧️</div>
-              <div>
-                <h4 style={styles.featureTitle}>Animated Weather Engine</h4>
-                <p style={styles.featureDesc}>Live simulation of rain, fog, and day-night cycle overlays.</p>
               </div>
             </div>
           </div>
@@ -110,16 +107,11 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
       </div>
 
       <div className="auth-form-section">
-        <div className="glass-panel auth-card">
+        <div className="auth-card">
           {onBackToLanding && (
             <button
               onClick={onBackToLanding}
-              onMouseEnter={() => setBackHovered(true)}
-              onMouseLeave={() => setBackHovered(false)}
-              style={{
-                ...styles.backBtn,
-                color: backHovered ? 'var(--text-primary)' : 'var(--text-secondary)',
-              }}
+              className="auth-back-btn"
               title="Back to Landing Page"
             >
               <ArrowLeft size={14} />
@@ -131,22 +123,10 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
             {isSignUp ? 'Get started with TrafficFlow AI today' : 'Sign in to access your saved bookmarks and maps'}
           </p>
 
-          <div style={{
-            background: 'rgba(245, 158, 11, 0.1)',
-            border: '1px solid rgba(245, 158, 11, 0.25)',
-            borderRadius: '10px',
-            padding: '12px',
-            marginBottom: '20px',
-            fontSize: '0.78rem',
-            color: '#fbbf24',
-            display: 'flex',
-            alignItems: 'flex-start',
-            gap: '8px',
-            lineHeight: '1.4'
-          }}>
-            <span style={{ fontSize: '1.1rem', flexShrink: 0, marginTop: '-2px' }}>⚠️</span>
+          <div className="auth-warning-banner">
+            <ShieldAlert size={16} style={{ color: '#f59e0b', flexShrink: 0, marginTop: '2px' }} />
             <div>
-              <strong>API Keys Required:</strong> Keyless simulation is disabled. You must configure your own Google Maps and Mapbox keys in the app settings to render maps and compute routes.
+              <strong className="auth-warning-title">API Keys Required:</strong> Keyless simulation is disabled. You must configure your own Google Maps and Mapbox keys in settings.
             </div>
           </div>
 
@@ -162,7 +142,7 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
             </div>
           )}
 
-          <button onClick={handleGoogleSignIn} disabled={loading} style={styles.googleBtn}>
+          <button onClick={handleGoogleSignIn} disabled={loading} className="auth-google-btn">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -214,7 +194,7 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
               </div>
             </div>
 
-            <button type="submit" disabled={loading} className="glow-btn" style={styles.submitBtn}>
+            <button type="submit" disabled={loading} className="auth-submit-btn">
               {loading ? (
                 <>
                   <Loader2 size={18} className="spin" />
@@ -291,16 +271,18 @@ const styles = {
     gap: '16px',
     alignItems: 'flex-start',
   },
-  featureDot: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '10px',
-    background: 'rgba(255, 255, 255, 0.05)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+  featureIconWrapper: {
+    width: '44px',
+    height: '44px',
+    borderRadius: '12px',
+    background: 'rgba(99, 102, 241, 0.08)',
+    border: '1px solid rgba(99, 102, 241, 0.2)',
+    color: '#6366f1',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '1.25rem',
+    flexShrink: 0,
+    boxShadow: '0 4px 12px rgba(99, 102, 241, 0.06)',
   },
   featureTitle: {
     fontSize: '1rem',

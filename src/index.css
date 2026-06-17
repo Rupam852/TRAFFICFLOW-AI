@@ -872,13 +872,39 @@ h1, h2, h3, h4, h5, h6 {
 
 .auth-art-section {
   flex: 1.2;
-  background: radial-gradient(circle at 10% 20%, #1e1e38 0%, #080711 90%);
+  background: radial-gradient(circle at 15% 15%, #1e1b4b 0%, #03001e 50%, #0f172a 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 48px;
   color: #ffffff;
   position: relative;
+  overflow: hidden;
+}
+
+.auth-art-section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(99, 102, 241, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.05) 1px, transparent 1px);
+  background-size: 40px 40px;
+  mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+  pointer-events: none;
+}
+
+.auth-art-section::after {
+  content: '';
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  top: 10%;
+  left: 10%;
+  filter: blur(50px);
+  pointer-events: none;
 }
 
 .auth-form-section {
@@ -888,15 +914,131 @@ h1, h2, h3, h4, h5, h6 {
   justify-content: center;
   padding: 32px;
   background-color: var(--bg-primary);
+  background-image: radial-gradient(circle at 80% 80%, rgba(99, 102, 241, 0.05) 0%, transparent 60%);
   transition: background-color 0.3s ease;
   overflow-y: auto;
+  position: relative;
 }
 
+/* Auth Card Styling */
 .auth-card {
   width: 100%;
   max-width: 420px;
   padding: 40px;
   border-radius: 24px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-glass) !important;
+  backdrop-filter: blur(var(--glass-blur)) !important;
+  -webkit-backdrop-filter: blur(var(--glass-blur)) !important;
+  box-shadow: var(--shadow-glass), 0 20px 40px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 10;
+}
+.auth-card:hover {
+  border-color: var(--border-glow);
+  box-shadow: var(--shadow-glass), 0 25px 45px rgba(99, 102, 241, 0.08) !important;
+  transform: translateY(-2px);
+}
+
+/* Auth Google Button */
+.auth-google-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-bottom: 20px;
+}
+.auth-google-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary-glow);
+  transform: translateY(-1px);
+}
+.auth-google-btn:active {
+  transform: translateY(1px);
+}
+
+/* Auth Back Button */
+.auth-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-bottom: 24px;
+  padding: 0;
+  transition: all 0.2s ease;
+  outline: none;
+}
+.auth-back-btn:hover {
+  color: var(--text-primary);
+  transform: translateX(-3px);
+}
+
+/* Auth Submit Button with rich gradient */
+.auth-submit-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-top: 8px;
+  background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%) !important;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.25) !important;
+  border: none !important;
+  border-radius: 10px;
+  color: #ffffff !important;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.auth-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.35) !important;
+  opacity: 0.95;
+}
+.auth-submit-btn:active {
+  transform: translateY(1px);
+}
+.auth-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Warning Banner Styling */
+.auth-warning-banner {
+  background: rgba(245, 158, 11, 0.05);
+  border: 1px solid rgba(245, 158, 11, 0.15);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 20px;
+  font-size: 0.78rem;
+  color: #fbbf24;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.4;
+}
+.auth-warning-title {
+  color: #f59e0b;
+  font-weight: 700;
 }
 
 @media (max-width: 900px) {
