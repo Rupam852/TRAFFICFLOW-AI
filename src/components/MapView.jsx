@@ -144,12 +144,11 @@ export default function MapView({
       if (!mapContainerRef.current) return;
 
       try {
-        const themeStyles = settings.theme === 'dark' ? googleMapsDarkStyles : googleMapsBaseStyles;
-
         const map = new window.google.maps.Map(mapContainerRef.current, {
           center: { lat: 28.6139, lng: 77.2090 }, // New Delhi Default
           zoom: 12,
-          styles: themeStyles,
+          // Note: Omit local JS 'styles' array to prevent Google Maps from falling back to raster tiles.
+          // This allows full WebGL Vector map rendering which is required for two-finger rotate and tilt gestures.
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
