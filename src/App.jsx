@@ -516,7 +516,7 @@ export default function App() {
 
 
 
-  // Generate routes using Google Maps Directions, Mapbox, or dynamic fallback
+  // Generate routes using Mapbox, or dynamic fallback
   useEffect(() => {
     if (!destination) {
       setTimeout(() => setRouteOptions([]), 0);
@@ -525,7 +525,6 @@ export default function App() {
 
     const fetchRoutes = async () => {
       let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
-      let googleMapsErrorMsg = null;
       let mapboxErrorMsg = null;
 
       // If start is "My Current Location", fetch fresh GPS coordinates first
@@ -676,91 +675,7 @@ export default function App() {
         return finalRoutes;
       };
 
-      // 1. Try Google Maps Directions Service client-side first
-      if (gmapsLoaded && window.google && window.google.maps) {
-        try {
-          const response = await new Promise((resolve, reject) => {
-            let googleMode = window.google.maps.TravelMode.DRIVING;
-            if (travelMode === 'bicycle') googleMode = window.google.maps.TravelMode.BICYCLING;
-            if (travelMode === 'walk') googleMode = window.google.maps.TravelMode.WALKING;
-
-            const directionsService = new window.google.maps.DirectionsService();
-            directionsService.route(
-              {
-                origin: new window.google.maps.LatLng(start[1], start[0]),
-                destination: new window.google.maps.LatLng(end[1], end[0]),
-                travelMode: googleMode,
-                provideRouteAlternatives: true
-              },
-              (res, status) => {
-                if (status === window.google.maps.DirectionsStatus.OK) {
-                  resolve(res);
-                } else {
-                  reject(new Error('Google Maps directions failed with status: ' + status));
-                }
-              }
-            );
-          });
-
-          if (response.routes && response.routes.length > 0) {
-            incrementApiUsage('googleMaps');
-            const routesParsed = response.routes.map((route, index) => {
-              const coords = pinRoute(route.overview_path.map(latLng => [latLng.lng(), latLng.lat()]));
-              const distanceText = route.legs[0].distance.text;
-              
-              let durationVal = route.legs[0].duration.value;
-              if (travelMode === 'motorbike') durationVal = durationVal * 0.8;
-              const durationText = fmtDur(durationVal / 60);
-              
-              let traffic = 'smooth';
-              let delay = null;
-              if (index === 1) {
-                traffic = 'moderate';
-                delay = 'Minor traffic congestion';
-              } else if (index === 2) {
-                traffic = 'heavy';
-                delay = 'Alternate route delay warning';
-              }
-
-              let routeName = route.summary 
-                ? `via ${route.summary}`
-                : index === 0 ? 'Main Route' : `Alternate Route ${index}`;
-              
-              if (index === 0) {
-                routeName += ' (Best Recommended)';
-              }
-
-              return {
-                name: routeName,
-                distance: distanceText,
-                duration: durationText,
-                geometry: coords,
-                trafficStatus: traffic,
-                delayInfo: delay,
-                isRecommended: index === 0
-              };
-            });
-
-            // Supplement routes using real roads if less than 3
-            const finalRoutes = await supplementWithRealRoads(routesParsed);
-
-            setIsSimulationMode(false);
-            setRoutingError(null);
-            setRouteOptions(finalRoutes);
-            setSelectedRouteIndex(0);
-            return;
-          }
-        } catch (error) {
-          console.warn('Google Maps Directions Service failed, trying Mapbox API:', error);
-          if (error.message && error.message.includes('REQUEST_DENIED')) {
-            googleMapsErrorMsg = 'Directions API request denied. If you recently enabled it, Google can take up to 5-10 minutes to propagate the changes. Also, ensure your API Key has no "API restrictions" blocking Directions API (under Credentials > API Key settings in Google Console) and that billing is active for your Google Cloud project.';
-          } else {
-            googleMapsErrorMsg = error.message || 'Unknown error';
-          }
-        }
-      }
-
-      // 2. Try Mapbox Directions API if Mapbox key is present
+      // 1. Try Mapbox Directions API if Mapbox key is present (Primary routing engine)
       if (settings.mapboxKey) {
         try {
           let mapboxProfile = 'mapbox/driving';
@@ -811,22 +726,20 @@ export default function App() {
             const finalRoutes = await supplementWithRealRoads(routesParsed);
 
             setIsSimulationMode(false);
-            if (googleMapsErrorMsg) {
-              setRoutingError(`Google Directions API failed (${googleMapsErrorMsg}). Falling back to Mapbox API.`);
-            } else {
-              setRoutingError(null);
-            }
+            setRoutingError(null);
             setRouteOptions(finalRoutes);
             setSelectedRouteIndex(0);
             return;
           }
         } catch (error) {
-          console.warn('Mapbox directions API failed, using fallback simulation:', error);
+          console.warn('Mapbox directions API failed, using fallback OSRM:', error);
           mapboxErrorMsg = error.message || 'Unknown Mapbox error';
         }
+      } else {
+        mapboxErrorMsg = 'Mapbox access token is not configured in settings.';
       }
 
-      // 3. Try free OSRM (Open Source Routing Machine) API as a high-quality fallback (with retry & timeout)
+      // 2. Try free OSRM (Open Source Routing Machine) API as a high-quality fallback (with retry & timeout)
       try {
         let osrmProfile = 'driving';
         if (travelMode === 'bicycle') osrmProfile = 'bicycle';
@@ -889,11 +802,8 @@ export default function App() {
           const finalRoutes = await supplementWithRealRoads(routesParsed);
 
           setIsSimulationMode(false);
-          if (googleMapsErrorMsg || mapboxErrorMsg) {
-            let combined = '';
-            if (googleMapsErrorMsg) combined += `Google: ${googleMapsErrorMsg} `;
-            if (mapboxErrorMsg) combined += `Mapbox: ${mapboxErrorMsg} `;
-            setRoutingError(`${combined}Falling back to OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.`);
+          if (mapboxErrorMsg) {
+            setRoutingError(`Mapbox API failed (${mapboxErrorMsg}). Falling back to OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.`);
           } else {
             setRoutingError('Using OpenStreetMap (OSRM) backup. Local street routing may be limited in rural areas.');
           }
@@ -905,14 +815,11 @@ export default function App() {
         console.warn('OSRM directions API failed, using fallback simulation:', error);
       }
 
-      // 4. Simulation mode fallback route data with dynamic interpolation
+      // 3. Simulation mode fallback route data with dynamic interpolation
       const mockRoutes = generateDynamicMockRoutes(start, end, travelMode);
       setIsSimulationMode(true);
-      if (googleMapsErrorMsg || mapboxErrorMsg) {
-        let combined = '';
-        if (googleMapsErrorMsg) combined += `Google: ${googleMapsErrorMsg} `;
-        if (mapboxErrorMsg) combined += `Mapbox: ${mapboxErrorMsg} `;
-        setRoutingError(`${combined}All backup routing APIs are offline. Simulation mode active.`);
+      if (mapboxErrorMsg) {
+        setRoutingError(`Mapbox API failed (${mapboxErrorMsg}). All backup routing APIs are offline. Simulation mode active.`);
       } else {
         setRoutingError('All routing APIs offline. Simulation mode active.');
       }
