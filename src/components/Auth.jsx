@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Mail, Lock, ShieldAlert, ArrowRight, Navigation, Loader2, ArrowLeft } from 'lucide-react';
 
-export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToLanding }) {
+export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToLanding, onToggleMode }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -233,7 +233,11 @@ export default function Auth({ onAuthSuccess, isInitialSignUp = false, onBackToL
             <span>{isSignUp ? 'Already have an account?' : "Don't have an account?"}</span>
             <button
               onClick={() => {
-                setIsSignUp(!isSignUp);
+                if (onToggleMode) {
+                  onToggleMode(isSignUp ? 'login' : 'signup');
+                } else {
+                  setIsSignUp(!isSignUp);
+                }
                 setMessage({ type: '', text: '' });
               }}
               style={styles.toggleBtn}

@@ -546,7 +546,7 @@ export default function App() {
     }
   };
 
-  const handleNavigate = (mode) => {
+  const handleNavigate = (mode, replace = false) => {
     setAuthMode(mode);
     const searchParams = new URLSearchParams(window.location.search);
     if (mode === 'landing') {
@@ -559,7 +559,19 @@ export default function App() {
     
     const currentPage = new URLSearchParams(window.location.search).get('page') || 'landing';
     if (currentPage !== mode) {
-      window.history.pushState({ authMode: mode }, '', newUrl);
+      if (replace) {
+        window.history.replaceState({ authMode: mode }, '', newUrl);
+      } else {
+        window.history.pushState({ authMode: mode }, '', newUrl);
+      }
+    }
+  };
+
+  const handleBackToLanding = () => {
+    if (window.history.state && window.history.state.authMode) {
+      window.history.back();
+    } else {
+      handleNavigate('landing', true);
     }
   };
 
@@ -1360,21 +1372,13 @@ export default function App() {
 
   // Render Landing Page or Authentication screens if not signed in
   if (!user) {
-    if (authMode === 'login') {
+    if (authMode === 'login' || authMode === 'signup') {
       return (
         <Auth 
-          isInitialSignUp={false} 
+          isInitialSignUp={authMode === 'signup'} 
           onAuthSuccess={handleAuthSuccess} 
-          onBackToLanding={() => handleNavigate('landing')} 
-        />
-      );
-    }
-    if (authMode === 'signup') {
-      return (
-        <Auth 
-          isInitialSignUp={true} 
-          onAuthSuccess={handleAuthSuccess} 
-          onBackToLanding={() => handleNavigate('landing')} 
+          onBackToLanding={handleBackToLanding}
+          onToggleMode={(mode) => handleNavigate(mode, true)}
         />
       );
     }
