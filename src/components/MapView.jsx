@@ -151,7 +151,7 @@ export default function MapView({
           // Note: Omit local JS 'styles' array to prevent Google Maps from falling back to raster tiles.
           // This allows full WebGL Vector map rendering which is required for two-finger rotate and tilt gestures.
           mapTypeControl: false,
-          streetViewControl: false,
+          streetViewControl: true,
           fullscreenControl: false,
           renderingType: 'VECTOR', // Enable WebGL Vector maps for rotation & tilt
           tilt: 45, // Set default tilt to 45 so vector rendering features are obvious
