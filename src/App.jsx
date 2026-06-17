@@ -146,6 +146,7 @@ export default function App() {
   // Ref to track authMode inside event listeners without stale closure issues
   const authModeRef = useRef(authMode);
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
+  const [isGmapsAuthError, setIsGmapsAuthError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
   const [dismissedKeySetup, setDismissedKeySetup] = useState(false);
   
@@ -223,6 +224,7 @@ export default function App() {
   useEffect(() => {
     dashboardStateRef.current = {
       isSettingsOpen,
+      isGmapsAuthError,
       isShareEtaOpen,
       showLogoutConfirm,
       showWarningOnLogin,
@@ -240,6 +242,7 @@ export default function App() {
     };
   }, [
     isSettingsOpen,
+    isGmapsAuthError,
     isShareEtaOpen,
     showLogoutConfirm,
     showWarningOnLogin,
@@ -446,6 +449,7 @@ export default function App() {
     const handleDashboardPopState = (e) => {
       const {
         isSettingsOpen,
+        isGmapsAuthError,
         isShareEtaOpen,
         showLogoutConfirm,
         showWarningOnLogin,
@@ -465,6 +469,13 @@ export default function App() {
       // 1. Settings Modal
       if (isSettingsOpen) {
         setIsSettingsOpen(false);
+        window.history.pushState({ dashboard: true }, '');
+        return;
+      }
+
+      // 1b. Google Maps Auth Error Modal
+      if (isGmapsAuthError) {
+        setIsGmapsAuthError(false);
         window.history.pushState({ dashboard: true }, '');
         return;
       }
@@ -617,6 +628,12 @@ export default function App() {
 
   // Dynamically load Google Maps script globally
   useEffect(() => {
+    // Register Google Maps authentication failure handler
+    window.gm_authFailure = () => {
+      console.error('Google Maps API Authentication Failed.');
+      setIsGmapsAuthError(true);
+    };
+
     const oldScript = document.getElementById('google-maps-sdk');
     if (oldScript) {
       oldScript.remove();
@@ -635,6 +652,10 @@ export default function App() {
     script.onload = () => setGmapsLoaded(true);
     script.onerror = () => console.error('Google Maps API failed to load.');
     document.head.appendChild(script);
+
+    return () => {
+      window.gm_authFailure = null;
+    };
   }, [settings.googleMapsKey]);
 
   // Retrieve user's current location via HTML5 Geolocation API on mount
@@ -781,6 +802,7 @@ export default function App() {
     };
 
     setSettings(trimmedSettings);
+    setIsGmapsAuthError(false);
     localStorage.setItem('tf_theme', trimmedSettings.theme);
 
     if (user) {
@@ -1927,6 +1949,91 @@ export default function App() {
                 }}
               >
                 ⚙️ Setup API Keys in Settings
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Google Maps Authentication Error Warning Modal */}
+      {isGmapsAuthError && (
+        <div style={{ ...styles.disclaimerBackdrop, backdropFilter: 'blur(16px)', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}>
+          <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0', position: 'relative' }}>
+            <button
+              onClick={() => setIsGmapsAuthError(false)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'var(--transition-smooth)',
+              }}
+              title="Dismiss Warning"
+            >
+              <X size={18} />
+            </button>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <span style={{ fontSize: '2.5rem' }}>⚠️</span>
+              <h3 style={{ ...styles.disclaimerTitle, marginTop: '8px', color: '#ef4444' }}>Google Maps Key Validation Failed</h3>
+              <p style={{ ...styles.disclaimerText, marginTop: '6px' }}>
+                Your Google Maps API key loaded with errors. Google Maps will not render correctly until this is fixed.
+              </p>
+            </div>
+            <div style={styles.setupKeysList}>
+              <div style={{ ...styles.setupKeyRow, border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.03)' }}>
+                <span style={styles.setupKeyIcon}>💳</span>
+                <div>
+                  <div style={{ ...styles.setupKeyName, color: '#fca5a5' }}>Billing Account Required</div>
+                  <div style={styles.setupKeyDesc}>Google requires a valid billing account linked to your Cloud project, even within the free tier.</div>
+                </div>
+              </div>
+              <div style={{ ...styles.setupKeyRow, border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.03)' }}>
+                <span style={styles.setupKeyIcon}>💻</span>
+                <div>
+                  <div style={{ ...styles.setupKeyName, color: '#fca5a5' }}>Enable Maps JavaScript API</div>
+                  <div style={styles.setupKeyDesc}>Ensure "Maps JavaScript API" is enabled in your Google Cloud Console project's APIs library.</div>
+                </div>
+              </div>
+              <div style={{ ...styles.setupKeyRow, border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.03)' }}>
+                <span style={styles.setupKeyIcon}>🔒</span>
+                <div>
+                  <div style={{ ...styles.setupKeyName, color: '#fca5a5' }}>Referrer Restrictions</div>
+                  <div style={styles.setupKeyDesc}>Check if your key restrictions block the current website domain or localhost.</div>
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: '12px', marginTop: '24px', width: '100%' }}>
+              <button
+                className="glow-btn"
+                style={{ flex: 1, padding: '12px', fontSize: '0.9rem', cursor: 'pointer' }}
+                onClick={() => {
+                  setIsSettingsOpen(true);
+                }}
+              >
+                ⚙️ Update Settings
+              </button>
+              <button
+                style={{
+                  flex: 1, padding: '12px', borderRadius: '12px',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  color: 'var(--text-secondary)', fontSize: '0.9rem',
+                  cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                  transition: 'all 0.18s ease'
+                }}
+                onClick={() => setIsGmapsAuthError(false)}
+                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+              >
+                Dismiss
               </button>
             </div>
           </div>
