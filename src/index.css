@@ -950,16 +950,13 @@ h1, h2, h3, h4, h5, h6 {
 
 @keyframes pingPulse {
   0% {
-    transform: scale(0.8);
-    box-shadow: 0 0 0 0 var(--pulse-color);
+    box-shadow: 0 0 2px 1px var(--pulse-color);
   }
   50% {
-    transform: scale(1.25);
-    box-shadow: 0 0 10px 4px var(--pulse-color);
+    box-shadow: 0 0 8px 4px var(--pulse-color);
   }
   100% {
-    transform: scale(0.8);
-    box-shadow: 0 0 0 0 var(--pulse-color);
+    box-shadow: 0 0 2px 1px var(--pulse-color);
   }
 }
 
