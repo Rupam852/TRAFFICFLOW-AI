@@ -138,6 +138,7 @@ const generateDynamicMockRoutes = (start, end, travelMode) => {
 export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isSyncingSettings, setIsSyncingSettings] = useState(false);
   const [authMode, setAuthMode] = useState('landing'); // 'landing' | 'login' | 'signup'
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
@@ -258,6 +259,7 @@ export default function App() {
     }
 
     const fetchUserData = async () => {
+      setIsSyncingSettings(true);
       try {
         // 1. Fetch user settings
         const { data: settingsData, error: settingsError } = await supabase
@@ -328,6 +330,8 @@ export default function App() {
         }
       } catch (err) {
         console.error('Failed to sync data with Supabase:', err);
+      } finally {
+        setIsSyncingSettings(false);
       }
     };
 
@@ -1385,7 +1389,7 @@ export default function App() {
       )}
 
       {/* API Key Setup Guide — shown to new users and locks the app if keys are missing */}
-      {(!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && !dismissedKeySetup && (
+      {(!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && !dismissedKeySetup && !isSyncingSettings && (
         <div style={{ ...styles.disclaimerBackdrop, backdropFilter: 'blur(16px)', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}>
           <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0', position: 'relative' }}>
             <button
@@ -1503,7 +1507,7 @@ export default function App() {
         onStopSimulation={stopRouteSimulation}
       />
 
-      {(!settings.googleMapsKey || !settings.mapboxKey) ? (
+      {(!settings.googleMapsKey || !settings.mapboxKey) && !isSyncingSettings ? (
         <div style={styles.mapPlaceholderContainer}>
           <div className="glass-panel" style={styles.mapPlaceholderCard}>
             <div style={styles.placeholderIconWrapper}>
