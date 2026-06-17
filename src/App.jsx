@@ -5,7 +5,7 @@ import MapView from './components/MapView';
 import Sidebar from './components/Sidebar';
 import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
-import { Menu } from 'lucide-react';
+import { Menu, X, Map } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
 
 // Speed (km/h) per travel mode — used for mock route duration estimation
@@ -139,6 +139,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
+  const [dismissedKeySetup, setDismissedKeySetup] = useState(false);
   
   // Settings State
   const [settings, setSettings] = useState({
@@ -221,6 +222,7 @@ export default function App() {
 
   // Sync user database state on auth state changes
   useEffect(() => {
+    setDismissedKeySetup(false);
     if (!user) {
       setTimeout(() => {
         setSearchHistory([
@@ -1334,9 +1336,30 @@ export default function App() {
       )}
 
       {/* API Key Setup Guide — shown to new users and locks the app if keys are missing */}
-      {(!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && (
+      {(!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && !dismissedKeySetup && (
         <div style={{ ...styles.disclaimerBackdrop, backdropFilter: 'blur(16px)', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}>
-          <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0' }}>
+          <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0', position: 'relative' }}>
+            <button
+              onClick={() => setDismissedKeySetup(true)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'none',
+                border: 'none',
+                color: 'var(--text-secondary)',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                transition: 'var(--transition-smooth)',
+              }}
+              title="Close Setup Guide"
+            >
+              <X size={18} />
+            </button>
             <div style={{ textAlign: 'center', marginBottom: '16px' }}>
               <span style={{ fontSize: '2.5rem' }}>🔑</span>
               <h3 style={{ ...styles.disclaimerTitle, marginTop: '8px' }}>Mandatory API Key Configuration</h3>
@@ -1431,37 +1454,58 @@ export default function App() {
         onStopSimulation={stopRouteSimulation}
       />
 
-      <MapView
-        settings={settings}
-        gmapsLoaded={gmapsLoaded}
-        startLocation={startLocation}
-        destination={destination}
-        routeOptions={routeOptions}
-        selectedRouteIndex={selectedRouteIndex}
-        onRouteSelected={handleRouteSelected}
-        isRoutesLoading={isRoutesLoading}
-        isRouteSwitching={isRouteSwitching}
-        weather={weather}
-        setWeather={setWeather}
-        timeOfDay={timeOfDay}
-        setTimeOfDay={setTimeOfDay}
-        pois={pois}
-        onPoiClick={handlePoiClick}
-        onMapClick={() => {
-          if (window.innerWidth <= 640) {
-            setIsSidebarOpen(false);
-          }
-        }}
-        navMarkerPos={navMarkerPos}
-        navMarkerBearing={navMarkerBearing}
-        onMapCenterChange={setMapCenter}
-        activeAmenitySearch={activeAmenitySearch}
-        onPoisFound={setPois}
-        onAmenitiesSearchFallback={handleAmenitiesSearchFallback}
-        activeRoutingEngine={activeRoutingEngine}
-        routingError={routingError}
-        isRouteSimulationActive={isRouteSimulationActive}
-      />
+      {(!settings.googleMapsKey || !settings.mapboxKey) ? (
+        <div style={styles.mapPlaceholderContainer}>
+          <div className="glass-panel" style={styles.mapPlaceholderCard}>
+            <div style={styles.placeholderIconWrapper}>
+              <Map size={40} className="pulse" style={{ color: 'var(--primary)', filter: 'drop-shadow(0 0 8px var(--primary-glow))' }} />
+            </div>
+            <h3 style={styles.placeholderTitle}>Interactive Map View Disabled</h3>
+            <p style={styles.placeholderText}>
+              To load 3D vector tile layouts, telemetry tracking, and dynamic routing navigation, please configure your own **Google Maps** and **Mapbox** credentials in the application settings modal.
+            </p>
+            <button
+              className="glow-btn"
+              onClick={() => setIsSettingsOpen(true)}
+              style={styles.placeholderBtn}
+            >
+              ⚙️ Setup API Keys in Settings
+            </button>
+          </div>
+        </div>
+      ) : (
+        <MapView
+          settings={settings}
+          gmapsLoaded={gmapsLoaded}
+          startLocation={startLocation}
+          destination={destination}
+          routeOptions={routeOptions}
+          selectedRouteIndex={selectedRouteIndex}
+          onRouteSelected={handleRouteSelected}
+          isRoutesLoading={isRoutesLoading}
+          isRouteSwitching={isRouteSwitching}
+          weather={weather}
+          setWeather={setWeather}
+          timeOfDay={timeOfDay}
+          setTimeOfDay={setTimeOfDay}
+          pois={pois}
+          onPoiClick={handlePoiClick}
+          onMapClick={() => {
+            if (window.innerWidth <= 640) {
+              setIsSidebarOpen(false);
+            }
+          }}
+          navMarkerPos={navMarkerPos}
+          navMarkerBearing={navMarkerBearing}
+          onMapCenterChange={setMapCenter}
+          activeAmenitySearch={activeAmenitySearch}
+          onPoisFound={setPois}
+          onAmenitiesSearchFallback={handleAmenitiesSearchFallback}
+          activeRoutingEngine={activeRoutingEngine}
+          routingError={routingError}
+          isRouteSimulationActive={isRouteSimulationActive}
+        />
+      )}
 
     </div>
   );
@@ -1475,6 +1519,54 @@ const styles = {
     overflow: 'hidden',
     position: 'relative',
     backgroundColor: 'var(--bg-primary)',
+  },
+  mapPlaceholderContainer: {
+    flex: 1,
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#0a0d14',
+    padding: '24px',
+  },
+  mapPlaceholderCard: {
+    maxWidth: '460px',
+    padding: '40px 32px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    textAlign: 'center',
+    gap: '20px',
+    borderRadius: '16px',
+    border: '1px solid var(--border-color)',
+    boxShadow: 'var(--shadow-lg)',
+  },
+  placeholderIconWrapper: {
+    width: '80px',
+    height: '80px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--primary-glow)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: '8px',
+  },
+  placeholderTitle: {
+    fontSize: '1.4rem',
+    fontWeight: '800',
+    color: 'var(--text-primary)',
+    letterSpacing: '-0.01em',
+  },
+  placeholderText: {
+    fontSize: '0.85rem',
+    color: 'var(--text-secondary)',
+    lineHeight: '1.6',
+  },
+  placeholderBtn: {
+    marginTop: '8px',
+    padding: '12px 28px',
+    fontSize: '0.88rem',
+    fontWeight: '700',
   },
   loadingScreen: {
     display: 'flex',
