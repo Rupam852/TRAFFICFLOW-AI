@@ -904,15 +904,23 @@ h1, h2, h3, h4, h5, h6 {
   transition: var(--transition-smooth);
 }
 
+.weather-close-btn {
+  transition: var(--transition-fast);
+}
+
+.weather-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary) !important;
+}
+
 /* Mobile overrides for map controls and HUD elements */
 @media (max-width: 640px) {
   .recenter-btn-responsive {
     position: absolute !important;
-    top: auto !important;
-    left: auto !important;
+    top: 16px !important;
     right: 16px !important;
-    /* Positioned perfectly above the bottom climate widget */
-    bottom: calc(170px + env(safe-area-inset-bottom)) !important;
+    bottom: auto !important;
+    left: auto !important;
     padding: 8px 14px !important;
     font-size: 0.75rem !important;
     border-radius: 8px !important;
@@ -921,15 +929,31 @@ h1, h2, h3, h4, h5, h6 {
 
   .routing-status-responsive {
     position: absolute !important;
-    top: 16px !important;
-    left: auto !important;
-    right: 16px !important;
-    transform: none !important;
+    top: 80px !important;
+    left: 50% !important;
+    right: auto !important;
+    transform: translateX(-50%) !important;
     padding: 8px 12px !important;
     border-radius: 8px !important;
     font-size: 0.75rem !important;
-    max-width: calc(100% - 90px) !important; /* leaves room for hamburger menu on the left */
+    max-width: calc(100% - 32px) !important;
     z-index: 1000 !important;
+  }
+
+  .weather-trigger-btn {
+    left: 16px !important;
+    bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    width: 48px !important;
+    height: 48px !important;
+    border-radius: 50% !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+  }
+
+  .weather-trigger-text {
+    display: none !important;
   }
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset } from 'lucide-react';
+import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset, X, CloudSun } from 'lucide-react';
 
 // Base styles to hide Tropic of Cancer/Equator latitude lines while keeping borders
 const googleMapsBaseStyles = [
@@ -104,6 +104,7 @@ export default function MapView({
   const [mapLoaded, setMapLoaded] = useState(false);
   const [gmapsError, setGmapsError] = useState(false);
   const [autoFollow, setAutoFollow] = useState(true);
+  const [isWeatherPanelOpen, setIsWeatherPanelOpen] = useState(false);
 
   // Refs to track map boundary updates and avoid jumping zoom loops
   const hasFittedBoundsRef = useRef(false);
@@ -164,6 +165,7 @@ export default function MapView({
 
         // Collapse sidebar on map click
         map.addListener('click', () => {
+          setIsWeatherPanelOpen(false); // Close weather panel on map click
           if (onMapClickRef.current) onMapClickRef.current();
         });
 
@@ -691,84 +693,115 @@ export default function MapView({
         style={{ backgroundColor: timeOverlays[timeOfDay] }} 
       />
 
-      {/* Map Control Widget: Weather & Day/Night Toggle */}
-      <div className="glass-panel weather-widget-responsive" style={styles.weatherWidget}>
+      {/* Map Control Widget: Weather & Day/Night Toggle (Shown conditionally) */}
+      {isWeatherPanelOpen && (
+        <div 
+          className="glass-panel weather-widget-responsive" 
+          style={styles.weatherWidget}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Close Panel Button */}
+          <button 
+            onClick={() => setIsWeatherPanelOpen(false)}
+            style={styles.closeWidgetBtn}
+            className="weather-close-btn"
+            title="Close Settings"
+          >
+            <X size={16} />
+          </button>
 
-        {/* Live Auto badge — top line, always visible */}
-        {settings.openWeatherKey && (
-          <div style={{ marginBottom: '8px' }}>
-            <span
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                fontSize: '0.68rem',
-                fontWeight: '800',
-                color: 'var(--traffic-smooth)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                backgroundColor: 'rgba(16, 185, 129, 0.12)',
-                padding: '3px 8px',
-                borderRadius: '20px',
-                border: '1px solid rgba(16, 185, 129, 0.3)',
-              }}
-              title="Live Weather & Day-Night cycle syncing automatically via OpenWeatherMap"
-            >
-              🟢 Live · Auto
-            </span>
-          </div>
-        )}
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-          <span style={{ ...styles.widgetHeader, marginBottom: 0 }}>Climate & Time Engine</span>
-        </div>
-        
-        <div style={styles.widgetGroup}>
-          <span style={styles.widgetLabel}>Weather Mode:</span>
-          <div style={styles.btnRow}>
-            {['clear', 'rain', 'fog'].map((w) => (
-              <button
-                key={w}
+          {/* Live Auto badge — top line, always visible */}
+          {settings.openWeatherKey && (
+            <div style={{ marginBottom: '8px' }}>
+              <span
                 style={{
-                  ...styles.widgetBtn,
-                  background: weather === w ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                  color: weather === w ? '#ffffff' : 'var(--text-secondary)',
-                  borderColor: weather === w ? 'var(--primary)' : 'var(--border-color)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  fontSize: '0.68rem',
+                  fontWeight: '800',
+                  color: 'var(--traffic-smooth)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.06em',
+                  backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                  padding: '3px 8px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
                 }}
-                onClick={() => setWeather(w)}
+                title="Live Weather & Day-Night cycle syncing automatically via OpenWeatherMap"
               >
-                {w === 'clear' && <Sun size={14} />}
-                {w === 'rain' && <CloudRain size={14} />}
-                {w === 'fog' && <Compass size={14} />}
-                <span style={{ textTransform: 'capitalize' }}>{w}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+                🟢 Live · Auto
+              </span>
+            </div>
+          )}
 
-        <div style={styles.widgetGroup}>
-          <span style={styles.widgetLabel}>Day-Night Cycle:</span>
-          <div style={styles.btnRow}>
-            {['day', 'sunrise', 'sunset', 'night'].map((t) => (
-              <button
-                key={t}
-                style={{
-                  ...styles.widgetBtn,
-                  background: timeOfDay === t ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                  color: timeOfDay === t ? '#ffffff' : 'var(--text-secondary)',
-                  borderColor: timeOfDay === t ? 'var(--primary)' : 'var(--border-color)',
-                }}
-                onClick={() => setTimeOfDay(t)}
-              >
-                {t === 'day' && <Sun size={14} />}
-                {t === 'sunrise' && <Sunrise size={14} />}
-                {t === 'sunset' && <Sunset size={14} />}
-                {t === 'night' && <Moon size={14} />}
-              </button>
-            ))}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <span style={{ ...styles.widgetHeader, marginBottom: 0 }}>Climate & Time Engine</span>
+          </div>
+          
+          <div style={styles.widgetGroup}>
+            <span style={styles.widgetLabel}>Weather Mode:</span>
+            <div style={styles.btnRow}>
+              {['clear', 'rain', 'fog'].map((w) => (
+                <button
+                  key={w}
+                  style={{
+                    ...styles.widgetBtn,
+                    background: weather === w ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                    color: weather === w ? '#ffffff' : 'var(--text-secondary)',
+                    borderColor: weather === w ? 'var(--primary)' : 'var(--border-color)',
+                  }}
+                  onClick={() => setWeather(w)}
+                >
+                  {w === 'clear' && <Sun size={14} />}
+                  {w === 'rain' && <CloudRain size={14} />}
+                  {w === 'fog' && <Compass size={14} />}
+                  <span style={{ textTransform: 'capitalize' }}>{w}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={styles.widgetGroup}>
+            <span style={styles.widgetLabel}>Day-Night Cycle:</span>
+            <div style={styles.btnRow}>
+              {['day', 'sunrise', 'sunset', 'night'].map((t) => (
+                <button
+                  key={t}
+                  style={{
+                    ...styles.widgetBtn,
+                    background: timeOfDay === t ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                    color: timeOfDay === t ? '#ffffff' : 'var(--text-secondary)',
+                    borderColor: timeOfDay === t ? 'var(--primary)' : 'var(--border-color)',
+                  }}
+                  onClick={() => setTimeOfDay(t)}
+                >
+                  {t === 'day' && <Sun size={14} />}
+                  {t === 'sunrise' && <Sunrise size={14} />}
+                  {t === 'sunset' && <Sunset size={14} />}
+                  {t === 'night' && <Moon size={14} />}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Floating Weather Trigger Button (Pill on desktop, circle icon on mobile) */}
+      {!isWeatherPanelOpen && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation(); // Prevent map click listener from firing
+            setIsWeatherPanelOpen(true);
+          }}
+          className="glass-panel glow-btn weather-trigger-btn"
+          style={styles.weatherTriggerBtn}
+          title="Adjust Weather & Time Cycles"
+        >
+          <CloudSun size={18} />
+          <span className="weather-trigger-text">Climate Engine</span>
+        </button>
+      )}
 
       {/* Floating Recenter Map Button */}
       {navMarkerPos && (
@@ -969,5 +1002,38 @@ const styles = {
     border: '1px solid var(--border-color)',
     maxWidth: '280px',
     textAlign: 'center',
+  },
+  closeWidgetBtn: {
+    position: 'absolute',
+    top: '12px',
+    right: '12px',
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-secondary)',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'var(--transition-smooth)',
+  },
+  weatherTriggerBtn: {
+    position: 'absolute',
+    bottom: '20px',
+    left: '20px',
+    padding: '10px 16px',
+    borderRadius: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    zIndex: 100,
+    cursor: 'pointer',
+    boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: 'rgba(30,41,59,0.85)',
+    color: '#ffffff',
+    backdropFilter: 'blur(8px)',
+    transition: 'var(--transition-smooth)',
   },
 };
