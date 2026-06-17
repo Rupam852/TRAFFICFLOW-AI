@@ -257,17 +257,22 @@ const applyTomTomTrafficToRoutes = async (routes, tomtomKey, travelMode) => {
         }
       }
 
-      // Calculate new duration based on worstStatus/delay
+      // Calculate new duration based on worstStatus/delay.
+      // Use the real base duration (in minutes) preserved from OSRM/Mapbox, not a modeSpeed estimate.
       let trafficFactor = 1.0;
       if (worstStatus === 'moderate') trafficFactor = 1.2;
       else if (worstStatus === 'heavy') trafficFactor = 1.5;
       else if (worstStatus === 'blocked') trafficFactor = 2.2;
 
+      // route.durationMinutes holds the accurate raw duration from the routing engine (OSRM/Mapbox).
+      // Fall back to re-estimating from distance only if that field is missing (e.g. pure mock routes).
       const distKm = parseFloat(route.distance.replace(/[^\d.]/g, ''));
       let newDuration = route.duration;
-      if (!isNaN(distKm)) {
-        const baseSpeed = modeSpeed[travelMode] || 50;
-        const newMins = (distKm / baseSpeed) * 60 * trafficFactor + (totalDelaySec / 60);
+      const baseMins = route.durationMinutes && !isNaN(route.durationMinutes)
+        ? route.durationMinutes
+        : (!isNaN(distKm) ? (distKm / (modeSpeed[travelMode] || 50)) * 60 : null);
+      if (baseMins !== null) {
+        const newMins = baseMins * trafficFactor + (totalDelaySec / 60);
         newDuration = fmtDur(newMins);
       }
 
@@ -1179,13 +1184,17 @@ export default function App() {
             if (!res.ok) continue;
             const data = await res.json();
             if (data.code === 'Ok' && data.routes && data.routes[0]) {
-              const distKm = data.routes[0].distance / 1000;
-              const baseSpeed = modeSpeed[travelMode] || 50;
-              const calculatedMin = (distKm / baseSpeed) * 60 * trafficMultiplier;
+              const distKmNum = data.routes[0].distance / 1000;
+              // Use OSRM's actual duration (seconds → minutes), scaled by trafficMultiplier for alternate routes
+              const rawDurationMin = (data.routes[0].duration / 60);
+              const adjustedMin = travelMode === 'motorbike' ? rawDurationMin * 0.8 : rawDurationMin;
+              const durationMinutes = adjustedMin * trafficMultiplier;
               return {
                 geometry: pinRoute(data.routes[0].geometry.coordinates),
-                distance: distKm.toFixed(1) + ' km',
-                duration: fmtDur(calculatedMin),
+                distance: distKmNum.toFixed(1) + ' km',
+                distanceKm: distKmNum,
+                duration: fmtDur(durationMinutes),
+                durationMinutes,
               };
             }
           } catch (e) {
@@ -1213,6 +1222,7 @@ export default function App() {
             name: 'Alternative Route',
             distance: geom1?.distance ?? mockFallbacks[1].distance,
             duration: geom1?.duration ?? mockFallbacks[1].duration,
+            durationMinutes: geom1?.durationMinutes ?? null,
             geometry: geom1?.geometry ?? mockFallbacks[1].geometry,
             trafficStatus: 'moderate',
             delayInfo: 'Moderate traffic expected',
@@ -1225,6 +1235,7 @@ export default function App() {
             name: 'Via City Roads',
             distance: geom2?.distance ?? mockFallbacks[2].distance,
             duration: geom2?.duration ?? mockFallbacks[2].duration,
+            durationMinutes: geom2?.durationMinutes ?? null,
             geometry: geom2?.geometry ?? mockFallbacks[2].geometry,
             trafficStatus: 'heavy',
             delayInfo: 'Heavy urban traffic',
@@ -1237,6 +1248,7 @@ export default function App() {
             name: 'Via City Roads',
             distance: geom1?.distance ?? mockFallbacks[2].distance,
             duration: geom1?.duration ?? mockFallbacks[2].duration,
+            durationMinutes: geom1?.durationMinutes ?? null,
             geometry: geom1?.geometry ?? mockFallbacks[2].geometry,
             trafficStatus: 'heavy',
             delayInfo: 'Heavy urban traffic',
@@ -1264,11 +1276,14 @@ export default function App() {
           if (data.routes && data.routes.length > 0) {
             incrementApiUsage('mapbox');
             const routesParsed = data.routes.map((r, index) => {
-              const distanceKm = (r.distance / 1000).toFixed(1) + ' km';
+              const distKmNum = r.distance / 1000;
+              const distanceKm = distKmNum.toFixed(1) + ' km';
               
+              // Mapbox returns duration in seconds — convert to minutes
               const rawDuration = r.duration;
               const adjustedDuration = travelMode === 'motorbike' ? rawDuration * 0.8 : rawDuration;
-              const durationMin = fmtDur(adjustedDuration / 60);
+              const durationMinutes = adjustedDuration / 60;  // store raw minutes for accurate traffic adjustment
+              const durationMin = fmtDur(durationMinutes);
               
               let traffic = 'smooth';
               let delay = '';
@@ -1294,7 +1309,9 @@ export default function App() {
               return {
                 name: routeName,
                 distance: distanceKm,
+                distanceKm: distKmNum,          // raw km number for reference
                 duration: durationMin,
+                durationMinutes,                  // raw minutes — preserved for accurate traffic-adjusted time
                 geometry: pinRoute(r.geometry.coordinates),
                 trafficStatus: traffic,
                 delayInfo: delay,
@@ -1344,11 +1361,14 @@ export default function App() {
 
         if (data && data.code === 'Ok' && data.routes && data.routes.length > 0) {
           const routesParsed = data.routes.map((r, index) => {
-            const distanceKm = (r.distance / 1000).toFixed(1) + ' km';
+            const distKmNum = r.distance / 1000;
+            const distanceKm = distKmNum.toFixed(1) + ' km';
             
+            // OSRM returns duration in seconds — convert to minutes
             const rawDuration = r.duration;
             const adjustedDuration = travelMode === 'motorbike' ? rawDuration * 0.8 : rawDuration;
-            const durationMin = fmtDur(adjustedDuration / 60);
+            const durationMinutes = adjustedDuration / 60;  // store raw minutes for accurate traffic adjustment
+            const durationMin = fmtDur(durationMinutes);
             
             let traffic = 'smooth';
             let delay = null;
@@ -1374,7 +1394,9 @@ export default function App() {
             return {
               name: routeName,
               distance: distanceKm,
+              distanceKm: distKmNum,          // raw km number for reference
               duration: durationMin,
+              durationMinutes,                  // raw minutes — preserved for accurate traffic-adjusted time
               geometry: pinRoute(r.geometry.coordinates),
               trafficStatus: traffic,
               delayInfo: delay,
