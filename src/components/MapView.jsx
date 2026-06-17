@@ -108,6 +108,7 @@ export default function MapView({
   // Refs to track map boundary updates and avoid jumping zoom loops
   const hasFittedBoundsRef = useRef(false);
   const lastRouteKeyRef = useRef('');
+  const wasSimulationActiveRef = useRef(false);
 
   const onMapClickRef = useRef(onMapClick);
   const onPoiClickRef = useRef(onPoiClick);
@@ -437,15 +438,10 @@ export default function MapView({
       if (hasBearing) {
         mapRef.current.setHeading(navMarkerBearing);
         mapRef.current.setTilt(45); // 3D navigation perspective
-      } else {
-        mapRef.current.setHeading(0);
-        mapRef.current.setTilt(0);
       }
-    } else {
-      // Reset map view to 2D flat North-up when manual pan/drag is active
-      mapRef.current.setHeading(0);
-      mapRef.current.setTilt(0);
     }
+    // Note: Omitted the 'else' blocks that reset heading and tilt to 0. 
+    // This allows the user to rotate, pan, and tilt the map freely without it snapping back to North-up.
   }, [navMarkerPos, navMarkerBearing, mapLoaded, autoFollow]);
 
   // Handle automatic follow reset when route simulation starts/stops
@@ -461,22 +457,22 @@ export default function MapView({
           mapRef.current.setHeading(navMarkerBearing);
         }
       }
-    } else {
+    } else if (wasSimulationActiveRef.current) {
+      // Only reset the camera heading and tilt once when the simulation is explicitly stopped
       if (mapRef.current) {
         mapRef.current.setTilt(0);
         mapRef.current.setHeading(0);
       }
     }
+    wasSimulationActiveRef.current = isRouteSimulationActive;
   }, [isRouteSimulationActive, navMarkerPos, navMarkerBearing]);
 
   // Synchronize Google Map styles dynamically with timeOfDay (day/night cycle) and settings.theme
   useEffect(() => {
     if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
 
-    const isNightMode = timeOfDay === 'night' || settings.theme === 'dark';
-    const themeStyles = isNightMode ? googleMapsDarkStyles : googleMapsBaseStyles;
-
-    mapRef.current.setOptions({ styles: themeStyles });
+    // Note: Omit calling setOptions({ styles }) because dynamic JS styling is not supported on vector maps.
+    // Calling it forces a fallback to raster rendering, which disables tilt and rotation gestures.
   }, [timeOfDay, settings.theme, mapLoaded]);
 
   // Handle active amenity searches around map center
