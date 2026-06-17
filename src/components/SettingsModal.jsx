@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { X, ShieldAlert, Key, Globe, Eye, EyeOff, Check, Moon, Sun } from 'lucide-react';
-import { getApiUsage, getApiLimits } from '../utils/usage';
 
 export default function SettingsModal({ isOpen, onClose, settings, onSaveSettings }) {
   const [theme, setTheme] = useState(settings.theme || 'dark');
@@ -18,22 +17,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
   const [showAiKey, setShowAiKey] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
 
-  const [apiUsage, setApiUsage] = useState(getApiUsage());
-  const limits = getApiLimits();
-
-  // Listen for usage updates while settings is open
-  useEffect(() => {
-    if (!isOpen) return;
-    setTimeout(() => {
-      setApiUsage(getApiUsage());
-    }, 0);
-    const handleUsageUpdate = () => {
-      setApiUsage(getApiUsage());
-    };
-    window.addEventListener('api-usage-updated', handleUsageUpdate);
-    return () => window.removeEventListener('api-usage-updated', handleUsageUpdate);
-  }, [isOpen]);
-
   // Sync state if settings prop changes
   useEffect(() => {
     setTimeout(() => {
@@ -46,26 +29,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
       setAiKey(settings.aiKey || '');
     }, 0);
   }, [settings, isOpen]);
-
-  const renderUsageBar = (current, limit) => {
-    const pct = Math.min(Math.round((current / limit) * 100), 100);
-    // Green (smooth) if <= 50%, Yellow (moderate) if <= 85%, Red (heavy) if > 85%
-    let barColor = 'var(--traffic-smooth)';
-    if (pct > 50 && pct <= 85) barColor = 'var(--traffic-moderate)';
-    if (pct > 85) barColor = 'var(--traffic-heavy)';
-
-    return (
-      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: '600' }}>
-          <span>Free Daily Quota Used: {pct}%</span>
-          <span>{current.toLocaleString()} / {limit.toLocaleString()} reqs</span>
-        </div>
-        <div style={{ width: '100%', height: '5px', backgroundColor: 'var(--bg-tertiary)', borderRadius: '3px', overflow: 'hidden', border: '1px solid var(--border-color)' }}>
-          <div style={{ width: `${pct}%`, height: '100%', backgroundColor: barColor, borderRadius: '3px', transition: 'var(--transition-smooth)' }} />
-        </div>
-      </div>
-    );
-  };
 
   if (!isOpen) return null;
 
@@ -175,7 +138,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                   </button>
                 </div>
                 <span style={styles.helperText}>Used for real-time maps, POI geocoding, and Google directions routing.</span>
-                {renderUsageBar(apiUsage.googleMaps, limits.googleMaps)}
               </div>
 
               <div className="input-group">
@@ -199,7 +161,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                   </button>
                 </div>
                 <span style={styles.helperText}>Used for high-fidelity 3D vector tile layouts.</span>
-                {renderUsageBar(apiUsage.mapbox, limits.mapbox)}
               </div>
 
               <div className="input-group">
@@ -223,7 +184,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                   </button>
                 </div>
                 <span style={styles.helperText}>Used for real-time delay, incident analysis, and congestion mapping.</span>
-                {renderUsageBar(apiUsage.tomtom, limits.tomtom)}
               </div>
 
               <div className="input-group">
@@ -247,7 +207,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                   </button>
                 </div>
                 <span style={styles.helperText}>Enables automatic climate & day-night time cycles sync on the map based on live real-world weather.</span>
-                {renderUsageBar(apiUsage.openWeather, limits.openWeather)}
               </div>
             </div>
 
@@ -289,7 +248,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                   </button>
                 </div>
                 <span style={styles.helperText}>Powers natural language route summaries and sudden traffic updates.</span>
-                {renderUsageBar(apiUsage.ai, limits.ai)}
               </div>
             </div>
 
