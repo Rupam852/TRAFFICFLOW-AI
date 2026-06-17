@@ -139,7 +139,10 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [isSyncingSettings, setIsSyncingSettings] = useState(false);
-  const [authMode, setAuthMode] = useState('landing'); // 'landing' | 'login' | 'signup'
+  const [authMode, setAuthMode] = useState(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    return searchParams.get('page') || 'landing';
+  });
   const [gmapsLoaded, setGmapsLoaded] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
   const [dismissedKeySetup, setDismissedKeySetup] = useState(false);
@@ -205,6 +208,18 @@ export default function App() {
   const [isShareEtaOpen, setIsShareEtaOpen] = useState(false);
   const [showWarningOnLogin, setShowWarningOnLogin] = useState(false);
 
+  // Synchronize authMode view with URL query parameters for browser navigation support
+  useEffect(() => {
+    const handlePopState = () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const page = searchParams.get('page') || 'landing';
+      setAuthMode(page);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Sync Supabase Auth session
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -226,7 +241,19 @@ export default function App() {
       setUser(prev => (prev?.id === sessionUser?.id ? prev : sessionUser));
       setAuthLoading(false);
       if (!session) {
-        setAuthMode('landing');
+        const searchParams = new URLSearchParams(window.location.search);
+        const page = searchParams.get('page');
+        if (page === 'login' || page === 'signup') {
+          setAuthMode(page);
+        } else {
+          setAuthMode('landing');
+        }
+      } else {
+        const searchParams = new URLSearchParams(window.location.search);
+        if (searchParams.has('page')) {
+          const cleanUrl = window.location.pathname;
+          window.history.replaceState(null, '', cleanUrl);
+        }
       }
       
       // Clean up URL hash after successful sign in / redirect state change
@@ -487,10 +514,27 @@ export default function App() {
     }
   };
 
+  const handleNavigate = (mode) => {
+    setAuthMode(mode);
+    const searchParams = new URLSearchParams(window.location.search);
+    if (mode === 'landing') {
+      searchParams.delete('page');
+    } else {
+      searchParams.set('page', mode);
+    }
+    const newSearch = searchParams.toString();
+    const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ''}`;
+    
+    const currentPage = new URLSearchParams(window.location.search).get('page') || 'landing';
+    if (currentPage !== mode) {
+      window.history.pushState({ authMode: mode }, '', newUrl);
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setAuthMode('landing');
+    handleNavigate('landing');
   };
 
   const handleSaveSettings = async (newSettings) => {
@@ -1289,7 +1333,7 @@ export default function App() {
         <Auth 
           isInitialSignUp={false} 
           onAuthSuccess={handleAuthSuccess} 
-          onBackToLanding={() => setAuthMode('landing')} 
+          onBackToLanding={() => handleNavigate('landing')} 
         />
       );
     }
@@ -1298,11 +1342,11 @@ export default function App() {
         <Auth 
           isInitialSignUp={true} 
           onAuthSuccess={handleAuthSuccess} 
-          onBackToLanding={() => setAuthMode('landing')} 
+          onBackToLanding={() => handleNavigate('landing')} 
         />
       );
     }
-    return <LandingPage onNavigate={setAuthMode} />;
+    return <LandingPage onNavigate={handleNavigate} />;
   }
 
   return (
