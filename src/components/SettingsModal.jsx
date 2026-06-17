@@ -74,7 +74,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
           </div>
         </div>
 
-        <form onSubmit={handleSave} style={styles.form}>
+        <form onSubmit={handleSave} style={styles.form} autoComplete="off">
           <div style={styles.scrollArea}>
             
             {/* Visual Style Settings */}
@@ -128,6 +128,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                     value={googleMapsKey}
                     onChange={(e) => setGoogleMapsKey(e.target.value)}
                     style={styles.fieldPadding}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -151,6 +152,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                     value={mapboxKey}
                     onChange={(e) => setMapboxKey(e.target.value)}
                     style={styles.fieldPadding}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -174,6 +176,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                     value={tomtomKey}
                     onChange={(e) => setTomtomKey(e.target.value)}
                     style={styles.fieldPadding}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -197,6 +200,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                     value={openWeatherKey}
                     onChange={(e) => setOpenWeatherKey(e.target.value)}
                     style={styles.fieldPadding}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
@@ -238,6 +242,7 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                     value={aiKey}
                     onChange={(e) => setAiKey(e.target.value)}
                     style={styles.fieldPadding}
+                    autoComplete="new-password"
                   />
                   <button
                     type="button"
