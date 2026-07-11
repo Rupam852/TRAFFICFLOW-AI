@@ -792,9 +792,11 @@ export default function App() {
     // Wait until both auth state has initialized and user settings have synced from Supabase
     if (authLoading || isSyncingSettings) return;
 
-    // Register Google Maps authentication failure handler
+    // Register Google Maps authentication failure handler BEFORE script is injected.
+    // Important: do NOT clear this in cleanup — if the component remounts (page refresh),
+    // the handler must still be alive when Google fires gm_authFailure.
     window.gm_authFailure = () => {
-      console.error('Google Maps API Authentication Failed.');
+      console.error('Google Maps API Authentication Failed — check key domain restrictions in Google Cloud Console.');
       setIsGmapsAuthError(true);
     };
 
@@ -819,17 +821,19 @@ export default function App() {
 
     const script = document.createElement('script');
     script.id = 'google-maps-sdk';
-    // Load keyless by default for public usage, or use key if provided in settings
-    script.src = `https://maps.googleapis.com/maps/api/js?${keyParam}&libraries=places&v=weekly`;
+    script.src = `https://maps.googleapis.com/maps/api/js?${keyParam}&libraries=places&v=weekly&loading=async`;
     script.async = true;
     script.defer = true;
     script.onload = () => setGmapsLoaded(true);
-    script.onerror = () => console.error('Google Maps API failed to load.');
+    // If the script itself fails to load (network error, invalid key format), show auth error
+    script.onerror = () => {
+      console.error('Google Maps API script failed to load. Check your API key and network.');
+      setIsGmapsAuthError(true);
+    };
     document.head.appendChild(script);
 
-    return () => {
-      window.gm_authFailure = null;
-    };
+    // Note: do NOT return a cleanup that nullifies gm_authFailure —
+    // Google Maps fires this callback asynchronously after the effect has cleaned up.
   }, [settings.googleMapsKey, authLoading, isSyncingSettings]);
 
   // Retrieve user's current location via HTML5 Geolocation API on mount
