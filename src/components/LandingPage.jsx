@@ -108,10 +108,6 @@ export default function LandingPage({ onNavigate }) {
       <section style={styles.heroSection}>
         <div style={styles.heroLayout}>
           <div style={styles.heroLeft}>
-            <div style={styles.badge}>
-              <span style={styles.badgeDot}>•</span>
-              <span>Next-Gen Smart Navigation</span>
-            </div>
             <h1 className="landing-hero-title">
               Navigate Smarter with <span style={styles.gradientText}>AI-Powered</span> Route Optimization
             </h1>
