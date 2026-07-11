@@ -194,29 +194,18 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
             <div style={styles.section}>
               <h4 style={styles.sectionTitle}>AI Cognitive Routing</h4>
               <div className="input-group">
-                <label>Cognitive LLM Provider</label>
-                <select
-                  className="input-field"
-                  value={aiProvider}
-                  onChange={(e) => setAiProvider(e.target.value)}
-                  style={{ cursor: 'pointer' }}
-                >
-                  <option value="gemini">Google Gemini AI</option>
-                  <option value="openai">OpenAI (GPT-4o / GPT-3.5)</option>
-                  <option value="claude">Anthropic Claude (Sonnet / Haiku)</option>
-                </select>
-              </div>
-
-              <div className="input-group">
-                <label>{aiProvider.toUpperCase()} Secret Key</label>
+                <label>Google Gemini API Key</label>
                 <div style={styles.inputWrapper}>
                   <Key size={16} style={styles.inputIcon} />
                   <input
                     type={showAiKey ? 'text' : 'password'}
                     className="input-field"
-                    placeholder={`Insert your ${aiProvider} API key...`}
+                    placeholder="Insert your Google Gemini API key..."
                     value={aiKey}
-                    onChange={(e) => setAiKey(e.target.value)}
+                    onChange={(e) => {
+                      setAiKey(e.target.value);
+                      setAiProvider('gemini'); // Guarantee it is locked to gemini
+                    }}
                     style={styles.fieldPadding}
                     autoComplete="new-password"
                   />
@@ -228,9 +217,10 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
                     {showAiKey ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                <span style={styles.helperText}>Powers natural language route summaries and sudden traffic updates.</span>
+                <span style={styles.helperText}>Powers Google Gemini 2.5 Flash for natural language route summaries, validations, and traffic advisory updates.</span>
               </div>
             </div>
+
 
           </div>
 
