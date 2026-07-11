@@ -1087,12 +1087,10 @@ export default function App() {
               return;
             }
           } catch (aiErr) {
-            console.error("AI pre-route validation failed:", aiErr);
-            setRouteOptions([]);
-            setRoutingError(`AI Validation Error: ${aiErr.message || 'AI Key authentication failed.'}`);
-            setIsRoutesLoading(false);
-            return;
+            console.warn("AI pre-route validation failed/timed out. Falling back to standard distance and routing engines:", aiErr);
+            // Fallback: Proceed with standard routing checks if the AI does not respond or errors
           }
+
 
         }
 
