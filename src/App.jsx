@@ -1401,11 +1401,18 @@ export default function App() {
         console.warn('OSRM directions API failed, using fallback simulation:', error);
       }
 
+      // Calculate direct straight-line distance in km
+      const directDistKm = haversineMetres(start, end) / 1000;
+
       // If it is verified that no land route exists (e.g. cross-continent or separated by oceans),
-      // do not show simulated mock routes. Show an explicit error instead.
-      if (isNoRouteError) {
+      // or the distance is physically impossible/unrealistic (>3000 km straight line and APIs failed),
+      // or Mapbox explicitly rejects it due to distance limitations, do not show simulated mock routes.
+      const isDistanceImpossible = directDistKm > 3000;
+      const isApiDistanceLimit = mapboxErrorMsg?.toLowerCase().includes('exceeds') || mapboxErrorMsg?.toLowerCase().includes('distance') || mapboxErrorMsg?.toLowerCase().includes('too long');
+
+      if (isNoRouteError || isDistanceImpossible || isApiDistanceLimit) {
         setRouteOptions([]);
-        setRoutingError("Impossible Route: Start and destination are separated by oceans or have no connecting land roads. Please enter locations connected by land.");
+        setRoutingError(`Impossible Route: Start and destination are separated by oceans or have no connecting land roads (Direct distance: ${directDistKm.toFixed(0)} km). Please select locations connected by land.`);
         return;
       }
 
