@@ -89,7 +89,7 @@ export default function MapView({
     try {
       mapboxgl.accessToken = settings.mapboxKey;
       
-      const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11';
+      const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/navigation-day-v1' : 'mapbox://styles/mapbox/navigation-night-v1';
       
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
@@ -142,7 +142,7 @@ export default function MapView({
   // Handle dynamic map style switching on theme changes (avoids destroying/recreating map instance)
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
-    const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11';
+    const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/navigation-day-v1' : 'mapbox://styles/mapbox/navigation-night-v1';
     mapRef.current.setStyle(style);
   }, [settings.theme, mapLoaded]);
 
