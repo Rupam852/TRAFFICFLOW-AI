@@ -1046,7 +1046,8 @@ export default function App() {
       setIsRoutesLoading(true);
       try {
         let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
-      let mapboxErrorMsg = null;
+        let mapboxErrorMsg = null;
+        let isNoRouteError = false;
 
       // If start is "My Current Location", use the latest tracked GPS coordinates if available
       if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
@@ -1242,6 +1243,9 @@ export default function App() {
           );
           const data = await response.json();
           if (!response.ok) {
+            if (data.code === 'NoRoute' || data.code === 'NoSegment') {
+              isNoRouteError = true;
+            }
             throw new Error(data.message || `HTTP error ${response.status}`);
           }
           if (data.routes && data.routes.length > 0) {
@@ -1249,6 +1253,7 @@ export default function App() {
             const routesParsed = data.routes.map((r, index) => {
               const distKmNum = r.distance / 1000;
               const distanceKm = distKmNum.toFixed(1) + ' km';
+
               
               // Mapbox returns duration in seconds — convert to minutes
               const rawDuration = r.duration;
@@ -1321,6 +1326,9 @@ export default function App() {
             const response = await fetchWithTimeout(url, { timeout: 5000 });
             if (response.ok) {
               data = await response.json();
+              if (data && (data.code === 'NoRoute' || data.code === 'NoSegment')) {
+                isNoRouteError = true;
+              }
               if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
                 break;
               }
@@ -1391,6 +1399,14 @@ export default function App() {
         }
       } catch (error) {
         console.warn('OSRM directions API failed, using fallback simulation:', error);
+      }
+
+      // If it is verified that no land route exists (e.g. cross-continent or separated by oceans),
+      // do not show simulated mock routes. Show an explicit error instead.
+      if (isNoRouteError) {
+        setRouteOptions([]);
+        setRoutingError("Impossible Route: Start and destination are separated by oceans or have no connecting land roads. Please enter locations connected by land.");
+        return;
       }
 
       // 3. Simulation mode fallback route data with dynamic interpolation
