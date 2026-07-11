@@ -84,17 +84,12 @@ export default function MapView({
 
   // Helper to determine active Mapbox style based on theme and Climate Engine's Day-Night Cycle
   const getActiveMapStyle = () => {
-    // If night is selected in Climate Engine, load navigation-night-v1
+    // If night is selected in Climate Engine, load clean minimal dark style
     if (timeOfDay === 'night') {
-      return 'mapbox://styles/mapbox/navigation-night-v1';
+      return 'mapbox://styles/mapbox/dark-v11';
     }
     // For day, sunrise, and sunset
-    if (settings.theme === 'light') {
-      return 'mapbox://styles/mapbox/light-v11';
-    } else {
-      // In dark theme, if user manually clicks "Day" in climate engine, show colorful day map
-      return 'mapbox://styles/mapbox/navigation-day-v1';
-    }
+    return settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11';
   };
 
   // Initialize Mapbox GL JS map
