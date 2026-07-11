@@ -7,7 +7,33 @@ export default function AiPanel({ settings, startLocation, destination, routeOpt
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [generatingSummary, setGeneratingSummary] = useState(false);
+  const [hoveredPromptIdx, setHoveredPromptIdx] = useState(null);
   const chatEndRef = useRef(null);
+
+  // Helper to parse double asterisks (**) and render them as JSX bold tags
+  const renderMessageText = (text) => {
+    if (!text) return '';
+    const parts = text.split(/\*\*([\s\S]*?)\*\*/g);
+    return parts.map((part, index) => {
+      if (index % 2 === 1) {
+        return (
+          <strong 
+            key={index} 
+            style={{ 
+              fontWeight: '800', 
+              color: settings.theme === 'light' ? '#4f46e5' : '#818cf8',
+              background: 'rgba(99, 102, 241, 0.05)',
+              padding: '1px 4px',
+              borderRadius: '4px'
+            }}
+          >
+            {part}
+          </strong>
+        );
+      }
+      return part;
+    });
+  };
 
   // Trigger AI route summary analysis when route details change
   useEffect(() => {
@@ -218,16 +244,27 @@ Provide a concise, helpful, and localized answer based on their navigation query
         <div style={styles.quickPromptsWrap}>
           <span style={styles.quickPromptsLabel}>Quick Ask</span>
           <div style={styles.quickPrompts}>
-            {quickPrompts.map((q, i) => (
-              <button
-                key={i}
-                onClick={() => setInputText(q.label.replace('?', ''))}
-                style={styles.quickPromptBtn}
-                disabled={loading}
-              >
-                {q.icon} {q.label}
-              </button>
-            ))}
+            {quickPrompts.map((q, i) => {
+              const isHovered = hoveredPromptIdx === i;
+              return (
+                <button
+                  key={i}
+                  onClick={() => setInputText(q.label.replace('?', ''))}
+                  onMouseEnter={() => setHoveredPromptIdx(i)}
+                  onMouseLeave={() => setHoveredPromptIdx(null)}
+                  style={{
+                    ...styles.quickPromptBtn,
+                    borderColor: isHovered ? 'var(--primary)' : 'var(--border-color)',
+                    color: isHovered ? 'var(--primary)' : 'var(--text-secondary)',
+                    transform: isHovered ? 'translateY(-1px) scale(1.02)' : 'translateY(0) scale(1)',
+                    boxShadow: isHovered ? '0 4px 12px var(--border-glow)' : 'var(--shadow-sm)',
+                  }}
+                  disabled={loading}
+                >
+                  {q.icon} {q.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
@@ -260,10 +297,12 @@ Provide a concise, helpful, and localized answer based on their navigation query
                   borderTopLeftRadius: isAi ? '4px' : '16px',
                   borderTopRightRadius: isAi ? '16px' : '4px',
                   border: isAi ? '1px solid var(--border-color)' : 'none',
-                  boxShadow: isAi ? 'var(--shadow-sm)' : '0 4px 16px rgba(99,102,241,0.3)',
+                  boxShadow: isAi ? 'var(--shadow-sm)' : '0 4px 16px rgba(99,102,241,0.25)',
                 }}
               >
-                <div style={{ whiteSpace: 'pre-line', lineHeight: '1.55' }}>{msg.text}</div>
+                <div style={{ whiteSpace: 'pre-line', lineHeight: '1.6' }}>
+                  {isAi ? renderMessageText(msg.text) : msg.text}
+                </div>
                 <span style={styles.msgTime}>{msg.time}</span>
               </div>
             </div>
@@ -282,7 +321,7 @@ Provide a concise, helpful, and localized answer based on their navigation query
                 <span style={{ ...styles.dot, animationDelay: '320ms' }} />
               </div>
               <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                {generatingSummary ? 'Synthesizing route telemetry...' : 'Thinking...'}
+                {generatingSummary ? 'Synthesizing route telemetry...' : 'Advisor is analyzing...'}
               </span>
             </div>
           </div>
@@ -436,15 +475,14 @@ const styles = {
     flexWrap: 'wrap',
   },
   quickPromptBtn: {
-    padding: '5px 10px',
+    padding: '6px 12px',
     borderRadius: '20px',
     border: '1px solid var(--border-color)',
     background: 'var(--bg-secondary)',
-    color: 'var(--text-secondary)',
     fontSize: '0.72rem',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'all 0.2s ease',
+    transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
     whiteSpace: 'nowrap',
   },
 
