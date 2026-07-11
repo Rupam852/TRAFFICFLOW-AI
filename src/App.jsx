@@ -306,8 +306,6 @@ export default function App() {
   });
   // Ref to track authMode inside event listeners without stale closure issues
   const authModeRef = useRef(authMode);
-  const [gmapsLoaded, setGmapsLoaded] = useState(false);
-  const [isGmapsAuthError, setIsGmapsAuthError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => window.innerWidth > 640);
   const [dismissedKeySetup, setDismissedKeySetup] = useState(false);
   
@@ -385,7 +383,6 @@ export default function App() {
   useEffect(() => {
     dashboardStateRef.current = {
       isSettingsOpen,
-      isGmapsAuthError,
       isShareEtaOpen,
       showLogoutConfirm,
       showWarningOnLogin,
@@ -403,7 +400,6 @@ export default function App() {
     };
   }, [
     isSettingsOpen,
-    isGmapsAuthError,
     isShareEtaOpen,
     showLogoutConfirm,
     showWarningOnLogin,
@@ -634,13 +630,6 @@ export default function App() {
         return;
       }
 
-      // 1b. Google Maps Auth Error Modal
-      if (isGmapsAuthError) {
-        setIsGmapsAuthError(false);
-        window.history.pushState({ dashboard: true }, '');
-        return;
-      }
-
       // 2. Share ETA Modal
       if (isShareEtaOpen) {
         setIsShareEtaOpen(false);
@@ -663,7 +652,7 @@ export default function App() {
       }
 
       // 4. API Key setup card (if showing and not dismissed)
-      const isKeySetupVisible = (!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && !dismissedKeySetup && !isSyncingSettings;
+      const isKeySetupVisible = (!settings.mapboxKey) && !showWarningOnLogin && !dismissedKeySetup && !isSyncingSettings;
       if (isKeySetupVisible) {
         setDismissedKeySetup(true);
         window.history.pushState({ dashboard: true }, '');
@@ -786,55 +775,6 @@ export default function App() {
       document.body.style.overflow = 'hidden';
     };
   }, [user, authMode]);
-
-  // Dynamically load Google Maps script globally
-  useEffect(() => {
-    // Wait until both auth state has initialized and user settings have synced from Supabase
-    if (authLoading || isSyncingSettings) return;
-
-    // Register Google Maps authentication failure handler BEFORE script is injected.
-    // Important: do NOT clear this in cleanup — if the component remounts (page refresh),
-    // the handler must still be alive when Google fires gm_authFailure.
-    window.gm_authFailure = () => {
-      console.error('Google Maps API Authentication Failed — check key domain restrictions in Google Cloud Console.');
-      setIsGmapsAuthError(true);
-    };
-
-    const oldScript = document.getElementById('google-maps-sdk');
-    const keyParam = `key=${settings.googleMapsKey || ''}`;
-
-    if (oldScript) {
-      const currentSrc = oldScript.getAttribute('src') || '';
-      if (currentSrc.includes(keyParam) && window.google && window.google.maps) {
-        // Already loaded with the same key, do not reload
-        setTimeout(() => setGmapsLoaded(true), 0);
-        return;
-      }
-
-      // Key changed or google namespace missing, reload script
-      oldScript.remove();
-      if (window.google) {
-        delete window.google;
-      }
-      setTimeout(() => setGmapsLoaded(false), 0);
-    }
-
-    const script = document.createElement('script');
-    script.id = 'google-maps-sdk';
-    script.src = `https://maps.googleapis.com/maps/api/js?${keyParam}&libraries=places&v=weekly&loading=async`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setGmapsLoaded(true);
-    // If the script itself fails to load (network error, invalid key format), show auth error
-    script.onerror = () => {
-      console.error('Google Maps API script failed to load. Check your API key and network.');
-      setIsGmapsAuthError(true);
-    };
-    document.head.appendChild(script);
-
-    // Note: do NOT return a cleanup that nullifies gm_authFailure —
-    // Google Maps fires this callback asynchronously after the effect has cleaned up.
-  }, [settings.googleMapsKey, authLoading, isSyncingSettings]);
 
   // Retrieve user's current location via HTML5 Geolocation API on mount
   useEffect(() => {
@@ -1503,7 +1443,7 @@ export default function App() {
     }
 
 
-  }, [startLocation, destination, settings.mapboxKey, settings.tomtomKey, settings.aiProvider, settings.aiKey, gmapsLoaded, user, travelMode]);
+  }, [startLocation, destination, settings.mapboxKey, settings.tomtomKey, settings.aiProvider, settings.aiKey, user, travelMode]);
 
   // Real-time traffic tracking loop (updates every 60 seconds when route is active)
   useEffect(() => {
@@ -2148,17 +2088,10 @@ export default function App() {
             </div>
             <div style={styles.setupKeysList}>
               <div style={styles.setupKeyRow}>
-                <span style={styles.setupKeyIcon}>🗺️</span>
-                <div>
-                  <div style={styles.setupKeyName}>Google Maps API Key <span style={styles.setupKeyRequired}>Required</span></div>
-                  <div style={styles.setupKeyDesc}>Used for loading the interactive maps and geocoding places</div>
-                </div>
-              </div>
-              <div style={styles.setupKeyRow}>
                 <span style={styles.setupKeyIcon}>📍</span>
                 <div>
                   <div style={styles.setupKeyName}>Mapbox Access Token <span style={styles.setupKeyRequired}>Required</span></div>
-                  <div style={styles.setupKeyDesc}>Used for calculating real-time routes, directions and road geometry</div>
+                  <div style={styles.setupKeyDesc}>Used for loading the interactive maps, calculating routes, and road geometries</div>
                 </div>
               </div>
               <div style={styles.setupKeyRow}>
@@ -2190,92 +2123,6 @@ export default function App() {
           </div>
         </div>
       )}
-
-      {/* Google Maps Authentication Error Warning Modal */}
-      {isGmapsAuthError && (
-        <div style={{ ...styles.disclaimerBackdrop, backdropFilter: 'blur(16px)', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}>
-          <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0', position: 'relative' }}>
-            <button
-              onClick={() => setIsGmapsAuthError(false)}
-              style={{
-                position: 'absolute',
-                top: '16px',
-                right: '16px',
-                background: 'none',
-                border: 'none',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer',
-                padding: '6px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                transition: 'var(--transition-smooth)',
-              }}
-              title="Dismiss Warning"
-            >
-              <X size={18} />
-            </button>
-            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
-              <span style={{ fontSize: '2.5rem' }}>⚠️</span>
-              <h3 style={{ ...styles.disclaimerTitle, marginTop: '8px', color: '#ef4444' }}>Google Maps Key Validation Failed</h3>
-              <p style={{ ...styles.disclaimerText, marginTop: '6px' }}>
-                Your Google Maps API key loaded with errors. Google Maps will not render correctly until this is fixed.
-              </p>
-            </div>
-            <div style={styles.setupKeysList}>
-              <div style={{ ...styles.setupKeyRow, border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.03)' }}>
-                <span style={styles.setupKeyIcon}>💳</span>
-                <div>
-                  <div style={{ ...styles.setupKeyName, color: '#fca5a5' }}>Billing Account Required</div>
-                  <div style={styles.setupKeyDesc}>Google requires a valid billing account linked to your Cloud project, even within the free tier.</div>
-                </div>
-              </div>
-              <div style={{ ...styles.setupKeyRow, border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.03)' }}>
-                <span style={styles.setupKeyIcon}>💻</span>
-                <div>
-                  <div style={{ ...styles.setupKeyName, color: '#fca5a5' }}>Enable Maps JavaScript API</div>
-                  <div style={styles.setupKeyDesc}>Ensure "Maps JavaScript API" is enabled in your Google Cloud Console project's APIs library.</div>
-                </div>
-              </div>
-              <div style={{ ...styles.setupKeyRow, border: '1px solid rgba(239, 68, 68, 0.2)', background: 'rgba(239, 68, 68, 0.03)' }}>
-                <span style={styles.setupKeyIcon}>🔒</span>
-                <div>
-                  <div style={{ ...styles.setupKeyName, color: '#fca5a5' }}>Referrer Restrictions</div>
-                  <div style={styles.setupKeyDesc}>Check if your key restrictions block the current website domain or localhost.</div>
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '12px', marginTop: '24px', width: '100%' }}>
-              <button
-                className="glow-btn"
-                style={{ flex: 1, padding: '12px', fontSize: '0.9rem', cursor: 'pointer' }}
-                onClick={() => {
-                  setIsSettingsOpen(true);
-                }}
-              >
-                ⚙️ Update Settings
-              </button>
-              <button
-                style={{
-                  flex: 1, padding: '12px', borderRadius: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  color: 'var(--text-secondary)', fontSize: '0.9rem',
-                  cursor: 'pointer', fontFamily: 'var(--font-sans)',
-                  transition: 'all 0.18s ease'
-                }}
-                onClick={() => setIsGmapsAuthError(false)}
-                onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
-              >
-                Dismiss
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Navigation Layout Sidebars & Interactive Map View */}
       {/* Floating Hamburger Button for collapsed Sidebar */}
       {!isSidebarOpen && (
@@ -2291,7 +2138,6 @@ export default function App() {
       <Sidebar
         ref={sidebarRef}
         settings={settings}
-        gmapsLoaded={gmapsLoaded}
         isSidebarOpen={isSidebarOpen}
         onCollapse={() => setIsSidebarOpen(false)}
         startLocation={startLocation}
@@ -2322,7 +2168,7 @@ export default function App() {
         setActiveTab={setSidebarActiveTab}
       />
 
-      {(!settings.googleMapsKey || !settings.mapboxKey) && !isSyncingSettings ? (
+      {!settings.mapboxKey && !isSyncingSettings ? (
         <div style={styles.mapPlaceholderContainer}>
           <div className="glass-panel" style={styles.mapPlaceholderCard}>
             <div style={styles.placeholderIconWrapper}>
@@ -2330,7 +2176,7 @@ export default function App() {
             </div>
             <h3 style={styles.placeholderTitle}>Interactive Map View Disabled</h3>
             <p style={styles.placeholderText}>
-              To load 3D vector tile layouts, telemetry tracking, and dynamic routing navigation, please configure your own <strong>Google Maps</strong> and <strong>Mapbox</strong> credentials in the application settings modal.
+              To load 3D vector tile layouts, telemetry tracking, and dynamic routing navigation, please configure your own <strong>Mapbox</strong> credentials in the application settings modal.
             </p>
             <button
               className="glow-btn"
@@ -2344,7 +2190,6 @@ export default function App() {
       ) : (
         <MapView
           settings={settings}
-          gmapsLoaded={gmapsLoaded}
           startLocation={startLocation}
           destination={destination}
           routeOptions={routeOptions}

@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { CloudRain, Compass, Sun, Moon, Sunrise, Sunset, X, CloudSun, RotateCw, Box } from 'lucide-react';
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 export default function MapView({
   settings,
-  gmapsLoaded,
   startLocation,
   destination,
   routeOptions,
@@ -33,12 +34,12 @@ export default function MapView({
   const canvasRef = useRef(null);
   const mapRef = useRef(null);
   const markersRef = useRef([]);
-  const polylinesRef = useRef([]);
   const navMarkerRef = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
-  const [gmapsError, setGmapsError] = useState(false);
+  const [mapboxError, setMapboxError] = useState(false);
   const [autoFollow, setAutoFollow] = useState(true);
   const [isNetworkOnline, setIsNetworkOnline] = useState(navigator.onLine);
+  const [styleLoadedTrigger, setStyleLoadedTrigger] = useState(0);
 
   useEffect(() => {
     const handleOnline = () => setIsNetworkOnline(true);
@@ -81,83 +82,76 @@ export default function MapView({
     night: 'rgba(15, 23, 42, 0.45)',     // dark night
   };
 
-  // Load Google Maps JavaScript SDK when parent tells us it is loaded
+  // Initialize Mapbox GL JS map
   useEffect(() => {
-    if (!gmapsLoaded) {
-      setTimeout(() => setMapLoaded(false), 0);
-      mapRef.current = null;
-      return;
-    }
+    if (!settings.mapboxKey || !mapContainerRef.current) return;
 
-    const initGoogleMap = () => {
-      if (!mapContainerRef.current) return;
+    try {
+      mapboxgl.accessToken = settings.mapboxKey;
+      
+      const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11';
+      
+      const map = new mapboxgl.Map({
+        container: mapContainerRef.current,
+        style: style,
+        center: [77.2090, 28.6139], // New Delhi Default (lng, lat)
+        zoom: 11,
+        pitch: 45, // default premium 3D tilt
+        bearing: 0,
+        antialias: true
+      });
 
-      try {
-        const map = new window.google.maps.Map(mapContainerRef.current, {
-          center: { lat: 28.6139, lng: 77.2090 }, // New Delhi Default
-          zoom: 12,
-          // Note: Omit local JS 'styles' array to prevent Google Maps from falling back to raster tiles.
-          // This allows full WebGL Vector map rendering which is required for two-finger rotate and tilt gestures.
-          mapTypeControl: false,
-          streetViewControl: false,
-          fullscreenControl: false,
-          renderingType: 'VECTOR', // Enable WebGL Vector maps for rotation & tilt
-          tilt: 45, // Set default tilt to 45 so vector rendering features are obvious
-          heading: 0,
-          mapId: 'DEMO_MAP_ID', // Enable vector features like rotation and tilt on mobile
-          gestureHandling: 'greedy', // Enable single-finger panning on mobile
-          rotateControl: true, // Show rotate control
-          tiltControl: true, // Show tilt control
-        });
-
-        // Collapse sidebar on map click
-        map.addListener('click', () => {
-          setIsWeatherPanelOpen(false); // Close weather panel on map click
-          if (onMapClickRef.current) onMapClickRef.current();
-        });
-
-        // Detect manual dragging to disable auto-follow
-        map.addListener('dragstart', () => {
-          setAutoFollow(false);
-        });
-
-        // Track map center changes
-        map.addListener('idle', () => {
-          const center = map.getCenter();
-          if (center && onMapCenterChangeRef.current) {
-            onMapCenterChangeRef.current([center.lng(), center.lat()]);
-          }
-        });
-
+      map.on('load', () => {
         mapRef.current = map;
         setMapLoaded(true);
-        setGmapsError(false);
-      } catch (err) {
-        console.error('Failed to instantiate Google Maps:', err);
-        setGmapsError(true);
-      }
-    };
+        setMapboxError(false);
+      });
 
-    if (window.google && window.google.maps) {
-      initGoogleMap();
-    } else {
-      // Fallback: wait briefly or retry in case it's in a transitional state
-      const interval = setInterval(() => {
-        if (window.google && window.google.maps) {
-          initGoogleMap();
-          clearInterval(interval);
+      map.on('style.load', () => {
+        setStyleLoadedTrigger(prev => prev + 1);
+      });
+
+      map.on('click', (e) => {
+        // If clicked directly on map and not on layers
+        setIsWeatherPanelOpen(false);
+        if (onMapClickRef.current) onMapClickRef.current();
+      });
+
+      map.on('dragstart', () => {
+        setAutoFollow(false);
+      });
+
+      map.on('moveend', () => {
+        const center = map.getCenter();
+        if (center && onMapCenterChangeRef.current) {
+          onMapCenterChangeRef.current([center.lng, center.lat]);
         }
-      }, 100);
-      return () => clearInterval(interval);
-    }
-  }, [gmapsLoaded, settings.theme, setIsWeatherPanelOpen]);
+      });
 
-  // Handle drawing markers, routes, and POIs on the Google Map
+      return () => {
+        map.remove();
+        mapRef.current = null;
+        setMapLoaded(false);
+      };
+    } catch (err) {
+      console.error('Failed to instantiate Mapbox GL JS Map:', err);
+      setMapboxError(true);
+    }
+  }, [settings.mapboxKey, settings.theme]);
+
+  // Handle dynamic map style switching on theme changes (avoids destroying/recreating map instance)
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
+    if (!mapLoaded || !mapRef.current) return;
+    const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11';
+    mapRef.current.setStyle(style);
+  }, [settings.theme, mapLoaded]);
+
+  // Draw routes, markers, and POIs on the Mapbox Map
+  useEffect(() => {
+    if (!mapLoaded || !mapRef.current) return;
     const map = mapRef.current;
 
-    // Track if destination or route index changed (not traffic data) — only fit bounds on real changes
+    // Track if destination or route index changed
     const fitKey = `${destination?.coordinates?.join(',')}_${selectedRouteIndex}`;
     const shouldFitBounds = fitKey !== lastRouteKeyRef.current;
     if (shouldFitBounds) {
@@ -165,391 +159,292 @@ export default function MapView({
     }
 
     // Clear old markers
-    markersRef.current.forEach(m => m.setMap(null));
+    markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
 
-    // Clear old route polylines
-    polylinesRef.current.forEach(p => p.setMap(null));
-    polylinesRef.current = [];
+    // Clear old route sources/layers
+    if (map.getLayer('route-line')) map.removeLayer('route-line');
+    if (map.getLayer('route-outline')) map.removeLayer('route-outline');
+    if (map.getSource('route-source')) map.removeSource('route-source');
 
-    // Add Amenities POIs
+    // 1. Render Start Pin
+    if (startLocation?.coordinates) {
+      const el = document.createElement('div');
+      el.className = 'start-marker';
+      el.style.width = '18px';
+      el.style.height = '18px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#6366f1';
+      el.style.border = '3px solid #ffffff';
+      el.style.boxShadow = '0 0 10px rgba(99,102,241,0.6)';
+      
+      const m = new mapboxgl.Marker(el)
+        .setLngLat(startLocation.coordinates)
+        .addTo(map);
+      markersRef.current.push(m);
+
+      if (!navMarkerRef.current && shouldFitBounds) {
+        map.panTo(startLocation.coordinates);
+      }
+    }
+
+    // 2. Render Destination Pin
+    if (destination?.coordinates) {
+      const el = document.createElement('div');
+      el.className = 'destination-marker';
+      el.style.width = '18px';
+      el.style.height = '18px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#06b6d4';
+      el.style.border = '3px solid #ffffff';
+      el.style.boxShadow = '0 0 10px rgba(6,182,212,0.6)';
+
+      const m = new mapboxgl.Marker(el)
+        .setLngLat(destination.coordinates)
+        .addTo(map);
+      markersRef.current.push(m);
+    }
+
+    // 3. Render Amenities POIs
     if (pois && pois.length > 0) {
       pois.forEach(poi => {
-        const marker = new window.google.maps.Marker({
-          position: { lat: poi.coordinates[1], lng: poi.coordinates[0] },
-          map: map,
-          title: poi.name,
-          icon: {
-            path: window.google.maps.SymbolPath.CIRCLE,
-            scale: 12,
-            fillColor: '#ef4444',
-            fillOpacity: 0.9,
-            strokeColor: '#ffffff',
-            strokeWeight: 2,
-          },
-          label: {
-            text: poi.type === 'petrol' ? '⛽' : poi.type === 'restaurant' ? '🍔' : poi.type === 'hotel' ? '🏨' : '🏥',
-            fontSize: '11px',
-          }
-        });
+        const el = document.createElement('div');
+        el.className = 'poi-marker';
+        el.style.width = '26px';
+        el.style.height = '26px';
+        el.style.borderRadius = '50%';
+        el.style.backgroundColor = '#ef4444';
+        el.style.border = '2px solid #ffffff';
+        el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.35)';
+        el.style.display = 'flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.style.fontSize = '12px';
+        el.style.cursor = 'pointer';
+        el.innerText = poi.type === 'petrol' ? '⛽' : poi.type === 'restaurant' ? '🍔' : poi.type === 'hotel' ? '🏨' : '🏥';
 
-        marker.addListener('click', () => {
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
           if (onPoiClickRef.current) onPoiClickRef.current(poi);
         });
-        markersRef.current.push(marker);
+
+        const m = new mapboxgl.Marker(el)
+          .setLngLat(poi.coordinates)
+          .addTo(map);
+        markersRef.current.push(m);
       });
     }
 
-    // Render Start Pin if available
-    const startLatLng = startLocation?.coordinates
-      ? { lat: startLocation.coordinates[1], lng: startLocation.coordinates[0] }
-      : null;
-
-    if (startLatLng) {
-      const startMarker = new window.google.maps.Marker({
-        position: startLatLng,
-        map: map,
-        title: startLocation?.name || 'Start Location',
-        zIndex: 50,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 9,
-          fillColor: '#6366f1',
-          fillOpacity: 1,
-          strokeColor: '#ffffff',
-          strokeWeight: 3,
-        },
-      });
-      markersRef.current.push(startMarker);
-      if (!navMarkerRef.current) {
-        map.panTo(startLatLng);
-      }
-    }
-
-    if (!destination) return;
-
-    const endLatLng = { lat: destination.coordinates[1], lng: destination.coordinates[0] };
-
-    // Destination circle marker
-    const endMarker = new window.google.maps.Marker({
-      position: endLatLng,
-      map: map,
-      title: destination.name,
-      zIndex: 50,
-      icon: {
-        path: window.google.maps.SymbolPath.CIRCLE,
-        scale: 9,
-        fillColor: '#06b6d4',
-        fillOpacity: 1,
-        strokeColor: '#ffffff',
-        strokeWeight: 3,
-      },
-    });
-    markersRef.current.push(endMarker);
-
-    // Center on start location and zoom in close when route is decided, as requested
-    if (startLatLng && !hasFittedBoundsRef.current) {
-      map.setCenter(startLatLng);
-      map.setZoom(15);
-      hasFittedBoundsRef.current = true;
-      setAutoFollow(true); // Reset auto-follow when a new route is decided
-    }
-
-
-    // Draw only the currently selected route on the map
+    // 4. Render Active Route
     if (routeOptions && routeOptions.length > 0) {
       const route = routeOptions[selectedRouteIndex];
-      // Safety: skip if route or geometry is missing/invalid
-      if (!route || !route.geometry || route.geometry.length < 2) return;
-
-      const baseRouteColor = '#3b82f6'; // Royal Blue road color
-
-      const pathCoords = route.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
-
-      // Dashed connector: start marker → first route point
-      if (startLatLng && pathCoords.length > 0) {
-        const startConnector = new window.google.maps.Polyline({
-          path: [startLatLng, pathCoords[0]],
-          geodesic: true,
-          strokeColor: baseRouteColor,
-          strokeOpacity: 0.7,
-          strokeWeight: 2,
-          icons: [{
-            icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-            offset: '0', repeat: '10px',
-          }],
-          map, zIndex: 15,
-        });
-        polylinesRef.current.push(startConnector);
-      }
-
-      // Dashed connector: last route point → destination marker
-      if (pathCoords.length > 0) {
-        const endConnector = new window.google.maps.Polyline({
-          path: [pathCoords[pathCoords.length - 1], endLatLng],
-          geodesic: true,
-          strokeColor: baseRouteColor,
-          strokeOpacity: 0.7,
-          strokeWeight: 2,
-          icons: [{
-            icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 },
-            offset: '0', repeat: '10px',
-          }],
-          map, zIndex: 15,
-        });
-        polylinesRef.current.push(endConnector);
-      }
-
-      // 1. White outline backdrop (widest)
-      const outlinePoly = new window.google.maps.Polyline({
-        path: pathCoords,
-        geodesic: true,
-        strokeColor: '#ffffff',
-        strokeOpacity: 0.6,
-        strokeWeight: 12,
-        map, zIndex: 10,
-      });
-      polylinesRef.current.push(outlinePoly);
-
-      // 2. Base route path (thicker Royal Blue road representation)
-      const baseRoutePoly = new window.google.maps.Polyline({
-        path: pathCoords,
-        geodesic: true,
-        strokeColor: baseRouteColor,
-        strokeOpacity: 1.0,
-        strokeWeight: 7,
-        map, zIndex: 20,
-      });
-      baseRoutePoly.addListener('click', () => {
-        if (onRouteSelectedRef.current) {
-          onRouteSelectedRef.current(selectedRouteIndex);
-        }
-      });
-      polylinesRef.current.push(baseRoutePoly);
-
-      // 3. Inner traffic lines for specific traffic segments (drawn only where traffic is present)
-      if (route.trafficSegments && route.trafficSegments.length > 0) {
-        route.trafficSegments.forEach((segment) => {
-          // Only draw traffic indicator color if there is actual traffic (not smooth)
-          if (segment.trafficStatus !== 'smooth') {
-            let segmentColor = '#f59e0b'; // moderate
-            if (segment.trafficStatus === 'heavy') segmentColor = '#ef4444';
-            else if (segment.trafficStatus === 'blocked') segmentColor = '#7f1d1d';
-
-            const segmentCoords = segment.geometry.map(coord => ({ lat: coord[1], lng: coord[0] }));
-            const trafficPoly = new window.google.maps.Polyline({
-              path: segmentCoords,
-              geodesic: true,
-              strokeColor: segmentColor,
-              strokeOpacity: 1.0,
-              strokeWeight: 7.0, // Match base route thickness to overlay completely, like Google Maps
-              map, zIndex: 30,
-            });
-            trafficPoly.addListener('click', () => {
-              if (onRouteSelectedRef.current) {
-                onRouteSelectedRef.current(selectedRouteIndex);
+      if (route && route.geometry && route.geometry.length >= 2) {
+        const pathCoords = route.geometry; // Array of [lng, lat]
+        
+        // Assemble route features collection (for different traffic colors)
+        const features = [];
+        if (route.trafficSegments && route.trafficSegments.length > 0) {
+          route.trafficSegments.forEach(seg => {
+            features.push({
+              type: 'Feature',
+              properties: {
+                trafficStatus: seg.trafficStatus || 'smooth'
+              },
+              geometry: {
+                type: 'LineString',
+                coordinates: seg.geometry
               }
             });
-            polylinesRef.current.push(trafficPoly);
-          }
-        });
-      } else {
-        // Fallback: if trafficSegments is missing, draw a single traffic line in the middle if it's not smooth
-        if (route.trafficStatus !== 'smooth') {
-          let fallbackColor = '#f59e0b'; // moderate
-          if (route.trafficStatus === 'heavy') fallbackColor = '#ef4444';
-          else if (route.trafficStatus === 'blocked') fallbackColor = '#7f1d1d';
-
-          const trafficPoly = new window.google.maps.Polyline({
-            path: pathCoords,
-            geodesic: true,
-            strokeColor: fallbackColor,
-            strokeOpacity: 1.0,
-            strokeWeight: 7.0, // Match base route thickness
-            map, zIndex: 30,
           });
-          trafficPoly.addListener('click', () => {
-            if (onRouteSelectedRef.current) {
-              onRouteSelectedRef.current(selectedRouteIndex);
+        } else {
+          features.push({
+            type: 'Feature',
+            properties: {
+              trafficStatus: route.trafficStatus || 'smooth'
+            },
+            geometry: {
+              type: 'LineString',
+              coordinates: pathCoords
             }
           });
-          polylinesRef.current.push(trafficPoly);
+        }
+
+        // Add GEOJSON route source
+        map.addSource('route-source', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: features
+          }
+        });
+
+        // 4a. White outline Layer
+        map.addLayer({
+          id: 'route-outline',
+          type: 'line',
+          source: 'route-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#ffffff',
+            'line-width': 12,
+            'line-opacity': 0.6
+          }
+        });
+
+        // 4b. Base route path + traffic congestion styling
+        map.addLayer({
+          id: 'route-line',
+          type: 'line',
+          source: 'route-source',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': [
+              'match',
+              ['get', 'trafficStatus'],
+              'moderate', '#f59e0b',
+              'heavy', '#ef4444',
+              'blocked', '#7f1d1d',
+              '#3b82f6' // smooth / default
+            ],
+            'line-width': 7
+          }
+        });
+
+        // Allow selection/click on route line
+        map.on('click', 'route-line', () => {
+          if (onRouteSelectedRef.current) {
+            onRouteSelectedRef.current(selectedRouteIndex);
+          }
+        });
+
+        // Fit boundaries smoothly
+        if (shouldFitBounds && pathCoords.length > 0) {
+          const bounds = new mapboxgl.LngLatBounds();
+          pathCoords.forEach(pt => bounds.extend(pt));
+          if (startLocation?.coordinates) bounds.extend(startLocation.coordinates);
+          if (destination?.coordinates) bounds.extend(destination.coordinates);
+
+          map.fitBounds(bounds, {
+            padding: { top: 80, bottom: 80, left: 40, right: 40 },
+            duration: 1200
+          });
         }
       }
-
-      // Fit map bounds ONLY when destination or route index genuinely changed
-      if (shouldFitBounds) {
-        const bounds = new window.google.maps.LatLngBounds();
-        pathCoords.forEach(pt => bounds.extend(pt));
-        if (startLatLng) bounds.extend(startLatLng);
-        if (endLatLng) bounds.extend(endLatLng);
-        
-        // Capture current perspective before fitBounds flattens it
-        const currentTilt = map.getTilt() || 45;
-        const currentHeading = map.getHeading() || 0;
-        
-        map.fitBounds(bounds, { top: 80, right: 40, bottom: 80, left: 40 });
-        
-        // Restore perspective once bounds-fitting completes and map goes idle
-        const once = map.addListener('idle', () => {
-          map.setTilt(currentTilt);
-          if (currentHeading) {
-            map.setHeading(currentHeading);
-          }
-          once.remove();
-        });
-      }
     }
+  }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois, styleLoadedTrigger]);
 
-  }, [startLocation, destination, routeOptions, selectedRouteIndex, mapLoaded, pois]);
-
-  // Move navigator dot on the map when position updates
+  // Handle GPS location dot rendering and movement
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
+    if (!mapLoaded || !mapRef.current) return;
+    const map = mapRef.current;
+
     if (!navMarkerPos) {
       if (navMarkerRef.current) {
-        navMarkerRef.current.setMap(null);
+        navMarkerRef.current.remove();
         navMarkerRef.current = null;
       }
       return;
     }
 
-    const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
     const hasBearing = navMarkerBearing !== undefined && navMarkerBearing !== null;
 
-    const markerIcon = {
-      path: hasBearing ? window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW : window.google.maps.SymbolPath.CIRCLE,
-      scale: hasBearing ? 8 : 10,
-      fillColor: '#3b82f6',
-      fillOpacity: 1,
-      strokeColor: '#ffffff',
-      strokeWeight: 2.5,
-      rotation: hasBearing ? navMarkerBearing : 0,
-    };
-
     if (!navMarkerRef.current) {
-      navMarkerRef.current = new window.google.maps.Marker({
-        position: latlng,
-        map: mapRef.current,
-        title: 'You are here',
-        icon: markerIcon,
-        zIndex: 999,
-      });
-      // First time GPS arrives: zoom to user location at street level
-      mapRef.current.panTo(latlng);
-      mapRef.current.setZoom(16);
+      const el = document.createElement('div');
+      el.className = 'nav-marker';
+      el.style.width = '22px';
+      el.style.height = '22px';
+      el.style.borderRadius = '50%';
+      el.style.backgroundColor = '#3b82f6';
+      el.style.border = '3px solid #ffffff';
+      el.style.boxShadow = '0 0 14px rgba(59,130,246,0.9)';
+      el.style.display = 'flex';
+      el.style.alignItems = 'center';
+      el.style.justifyContent = 'center';
+
+      const arrow = document.createElement('div');
+      arrow.className = 'nav-arrow';
+      arrow.style.width = '0';
+      arrow.style.height = '0';
+      arrow.style.borderLeft = '5px solid transparent';
+      arrow.style.borderRight = '5px solid transparent';
+      arrow.style.borderBottom = '9px solid #ffffff';
+      arrow.style.transition = 'transform 0.15s ease';
+      arrow.style.display = hasBearing ? 'block' : 'none';
+      if (hasBearing) {
+        arrow.style.transform = `rotate(${navMarkerBearing}deg)`;
+      }
+      el.appendChild(arrow);
+
+      navMarkerRef.current = new mapboxgl.Marker(el)
+        .setLngLat(navMarkerPos)
+        .addTo(map);
+
+      map.easeTo({ center: navMarkerPos, zoom: 16 });
       setTimeout(() => {
         setAutoFollow(true);
       }, 0);
     } else {
-      navMarkerRef.current.setPosition(latlng);
-      navMarkerRef.current.setIcon(markerIcon);
+      navMarkerRef.current.setLngLat(navMarkerPos);
+      const arrow = navMarkerRef.current.getElement().querySelector('.nav-arrow');
+      if (arrow) {
+        if (hasBearing) {
+          arrow.style.display = 'block';
+          arrow.style.transform = `rotate(${navMarkerBearing}deg)`;
+        } else {
+          arrow.style.display = 'none';
+        }
+      }
     }
 
-    // Smoothly pan map to follow the navigator if autoFollow is active
     if (autoFollow) {
-      mapRef.current.panTo(latlng);
+      map.easeTo({ center: navMarkerPos });
       if (hasBearing) {
-        mapRef.current.setHeading(navMarkerBearing);
-        mapRef.current.setTilt(45); // 3D navigation perspective
+        map.easeTo({ bearing: navMarkerBearing, pitch: 45 });
       }
     }
   }, [navMarkerPos, navMarkerBearing, mapLoaded, autoFollow]);
 
-  // Handle automatic follow reset when route simulation starts/stops
+  // Adjust map viewport during simulation mode switches
   useEffect(() => {
     if (isRouteSimulationActive) {
       setTimeout(() => {
         setAutoFollow(true);
       }, 0);
       if (mapRef.current && navMarkerPos) {
-        const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
-        mapRef.current.setZoom(16);
-        mapRef.current.panTo(latlng);
-        mapRef.current.setTilt(45);
-        if (navMarkerBearing !== null && navMarkerBearing !== undefined) {
-          mapRef.current.setHeading(navMarkerBearing);
-        }
+        mapRef.current.easeTo({
+          center: navMarkerPos,
+          zoom: 16,
+          pitch: 45,
+          bearing: navMarkerBearing !== null ? navMarkerBearing : 0
+        });
       }
     } else if (wasSimulationActiveRef.current) {
-      // Only reset the camera heading and tilt once when the simulation is explicitly stopped
       if (mapRef.current) {
-        mapRef.current.setTilt(0);
-        mapRef.current.setHeading(0);
+        mapRef.current.easeTo({ pitch: 0, bearing: 0 });
       }
     }
     wasSimulationActiveRef.current = isRouteSimulationActive;
   }, [isRouteSimulationActive, navMarkerPos, navMarkerBearing]);
 
-  // Synchronize Google Map styles dynamically with timeOfDay (day/night cycle) and settings.theme
+  // Trigger fallback amenities searches around current map center
   useEffect(() => {
-    if (!mapLoaded || !mapRef.current || !window.google || !window.google.maps) return;
-
-    // Note: Omit calling setOptions({ styles }) because dynamic JS styling is not supported on vector maps.
-    // Calling it forces a fallback to raster rendering, which disables tilt and rotation gestures.
-  }, [timeOfDay, settings.theme, mapLoaded]);
-
-  // Handle active amenity searches around map center
-  useEffect(() => {
-    if (!activeAmenitySearch || !mapRef.current || !window.google || !window.google.maps) {
-      return;
-    }
+    if (!activeAmenitySearch || !mapRef.current) return;
 
     const { type } = activeAmenitySearch;
-    const map = mapRef.current;
-    const center = map.getCenter();
-    if (!center) return;
-
-    const googleTypes = {
-      petrol: 'gas_station',
-      restaurant: 'restaurant',
-      hotel: 'lodging',
-      hospital: 'hospital'
-    };
-
-    const googleType = googleTypes[type];
-
-    // If Places API is loaded, do a real search
-    if (window.google.maps.places) {
-      try {
-        const service = new window.google.maps.places.PlacesService(map);
-        service.nearbySearch(
-          {
-            location: center,
-            radius: 5000, // 5km search radius
-            type: [googleType]
-          },
-          (results, status) => {
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-              const list = results.map(r => ({
-                name: r.name,
-                type: type,
-                coordinates: [r.geometry.location.lng(), r.geometry.location.lat()]
-              }));
-              if (onPoisFoundRef.current) {
-                onPoisFoundRef.current(list);
-              }
-            } else {
-              console.warn('Google Places nearby search returned status:', status);
-              if (onAmenitiesSearchFallbackRef.current) {
-                onAmenitiesSearchFallbackRef.current(type, [center.lng(), center.lat()]);
-              }
-            }
-          }
-        );
-        return;
-      } catch (e) {
-        console.error('Failed to execute Google Places nearby search:', e);
-      }
-    }
-
-    // Fallback if places library is not loaded
-    if (onAmenitiesSearchFallbackRef.current) {
-      onAmenitiesSearchFallbackRef.current(type, [center.lng(), center.lat()]);
+    const center = mapRef.current.getCenter();
+    if (center && onAmenitiesSearchFallbackRef.current) {
+      // Mapbox centers are lng, lat
+      onAmenitiesSearchFallbackRef.current(type, [center.lng, center.lat]);
     }
   }, [activeAmenitySearch]);
 
-  // Weather Animations Loop (HTML5 Canvas overlay)
+  // Weather Canvas Animations Overlay (Rain / Fog effects)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -687,10 +582,10 @@ export default function MapView({
         </div>
       )}
 
-      {gmapsError ? (
+      {mapboxError ? (
         <div style={styles.errorBanner}>
-          <h3>Google Maps API Error</h3>
-          <span>Please make sure your Google Maps SDK Key is correct, or check your internet connection.</span>
+          <h3>Mapbox GL JS Loading Error</h3>
+          <span>Please make sure your Mapbox Access Token is configured correctly, or check your internet connection.</span>
         </div>
       ) : (
         <div ref={mapContainerRef} style={styles.mapContainer} />
@@ -705,7 +600,7 @@ export default function MapView({
         style={{ backgroundColor: timeOverlays[timeOfDay] }} 
       />
 
-      {/* Map Control Widget: Weather & Day/Night Toggle (Shown conditionally) */}
+      {/* Map Control Widget: Weather & Day/Night Toggle */}
       {isWeatherPanelOpen && (
         <div 
           className="glass-panel weather-widget-responsive" 
@@ -722,7 +617,7 @@ export default function MapView({
             <X size={16} />
           </button>
 
-          {/* Live Auto badge — top line, always visible */}
+          {/* Live Auto badge */}
           {settings.openWeatherKey && (
             <div style={{ marginBottom: '8px' }}>
               <span
@@ -799,11 +694,11 @@ export default function MapView({
         </div>
       )}
 
-      {/* Floating Weather Trigger Button (Pill on desktop, circle icon on mobile) */}
+      {/* Floating Weather Trigger Button */}
       {!isWeatherPanelOpen && (
         <button
           onClick={(e) => {
-            e.stopPropagation(); // Prevent map click listener from firing
+            e.stopPropagation();
             setIsWeatherPanelOpen(true);
           }}
           className="glass-panel glow-btn weather-trigger-btn"
@@ -822,9 +717,7 @@ export default function MapView({
             onClick={() => {
               setAutoFollow(true);
               if (mapRef.current && navMarkerPos) {
-                const latlng = { lat: navMarkerPos[1], lng: navMarkerPos[0] };
-                mapRef.current.panTo(latlng);
-                mapRef.current.setZoom(16);
+                mapRef.current.easeTo({ center: navMarkerPos, zoom: 16 });
               }
             }}
             className="glass-panel map-control-btn recenter-btn-responsive"
@@ -837,8 +730,8 @@ export default function MapView({
         <button
           onClick={() => {
             if (mapRef.current) {
-              const currentHeading = mapRef.current.getHeading() || 0;
-              mapRef.current.setHeading((currentHeading + 45) % 360);
+              const currentBearing = mapRef.current.getBearing() || 0;
+              mapRef.current.easeTo({ bearing: (currentBearing + 45) % 360 });
             }
           }}
           className="glass-panel map-control-btn"
@@ -850,9 +743,8 @@ export default function MapView({
         <button
           onClick={() => {
             if (mapRef.current) {
-              const currentTilt = mapRef.current.getTilt() || 0;
-              // Toggle between 2D (0 tilt) and 3D (45 tilt)
-              mapRef.current.setTilt(currentTilt === 0 ? 45 : 0);
+              const currentPitch = mapRef.current.getPitch() || 0;
+              mapRef.current.easeTo({ pitch: currentPitch === 0 ? 45 : 0 });
             }
           }}
           className="glass-panel map-control-btn"

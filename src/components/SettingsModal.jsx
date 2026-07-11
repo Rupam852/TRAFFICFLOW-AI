@@ -116,30 +116,6 @@ export default function SettingsModal({ isOpen, onClose, settings, onSaveSetting
             {/* Map & Traffic Integration */}
             <div style={styles.section}>
               <h4 style={styles.sectionTitle}>Mapping Credentials</h4>
-              
-              <div className="input-group">
-                <label>Google Maps API Key (Optional)</label>
-                <div style={styles.inputWrapper}>
-                  <Key size={16} style={styles.inputIcon} />
-                  <input
-                    type={showGoogleKey ? 'text' : 'password'}
-                    className="input-field"
-                    placeholder="Keyless / Local fallback by default..."
-                    value={googleMapsKey}
-                    onChange={(e) => setGoogleMapsKey(e.target.value)}
-                    style={styles.fieldPadding}
-                    autoComplete="new-password"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowGoogleKey(!showGoogleKey)}
-                    style={styles.eyeBtn}
-                  >
-                    {showGoogleKey ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-                <span style={styles.helperText}>Used for real-time maps, POI geocoding, and Google directions routing.</span>
-              </div>
 
               <div className="input-group">
                 <label>Mapbox GL Access Token</label>

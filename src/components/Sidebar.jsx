@@ -83,35 +83,23 @@ const Sidebar = forwardRef(function Sidebar({
     const trimmed = query.trim();
     const biasCoords = startLocation?.coordinates || [77.2090, 28.6139];
 
-    if (window.google && window.google.maps && window.google.maps.places) {
+    if (settings.mapboxKey) {
       try {
-        const autocompleteService = new window.google.maps.places.AutocompleteService();
-        const predictions = await new Promise((resolve, reject) => {
-          autocompleteService.getPlacePredictions(
-            {
-              input: trimmed,
-              locationBias: new window.google.maps.LatLng(biasCoords[1], biasCoords[0])
-            },
-            (predictions, status) => {
-              if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
-                resolve(predictions);
-              } else {
-                reject(new Error('No predictions'));
-              }
-            }
-          );
-        });
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${settings.mapboxKey}&proximity=${biasCoords[0]},${biasCoords[1]}&limit=5`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          const results = (data.features || []).map(f => ({
+            name: f.place_name,
+            coordinates: f.geometry.coordinates
+          }));
 
-        const results = predictions.slice(0, 5).map(p => ({
-          name: p.description,
-          placeId: p.place_id
-        }));
-
-        if (field === 'start') setStartSuggestions(results);
-        if (field === 'dest') setDestSuggestions(results);
-        return;
+          if (field === 'start') setStartSuggestions(results);
+          if (field === 'dest') setDestSuggestions(results);
+          return;
+        }
       } catch (err) {
-        // fall through
+        console.warn('Mapbox Autocomplete failed, falling back to Photon:', err);
       }
     }
 
@@ -133,7 +121,7 @@ const Sidebar = forwardRef(function Sidebar({
     } catch (err) {
       // silent fail
     }
-  }, [startLocation]);
+  }, [startLocation, settings.mapboxKey]);
 
   useEffect(() => {
     if (focusedField === 'start' && startInput.trim().length >= 2) {
@@ -159,28 +147,12 @@ const Sidebar = forwardRef(function Sidebar({
       setStartSuggestions([]);
       if (suggestion.coordinates) {
         setStartLocation({ name: suggestion.name, coordinates: suggestion.coordinates });
-      } else if (suggestion.placeId && window.google) {
-        const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ placeId: suggestion.placeId }, (results, status) => {
-          if (status === 'OK' && results[0]) {
-            const loc = results[0].geometry.location;
-            setStartLocation({ name: suggestion.name, coordinates: [loc.lng(), loc.lat()] });
-          }
-        });
       }
     } else {
       setDestInput(suggestion.name);
       setDestSuggestions([]);
       if (suggestion.coordinates) {
         setDestination({ name: suggestion.name, coordinates: suggestion.coordinates });
-      } else if (suggestion.placeId && window.google) {
-        const geocoder = new window.google.maps.Geocoder();
-        geocoder.geocode({ placeId: suggestion.placeId }, (results, status) => {
-          if (status === 'OK' && results[0]) {
-            const loc = results[0].geometry.location;
-            setDestination({ name: suggestion.name, coordinates: [loc.lng(), loc.lat()] });
-          }
-        });
       }
     }
   }, [setStartLocation, setDestination]);
@@ -190,18 +162,21 @@ const Sidebar = forwardRef(function Sidebar({
     incrementApiUsage('routing');
 
     const geocodeQuery = async (query) => {
-      if (window.google && window.google.maps) {
+      if (settings.mapboxKey) {
         try {
-          const geocoder = new window.google.maps.Geocoder();
-          const result = await new Promise((resolve, reject) => {
-            geocoder.geocode({ address: query }, (results, status) => {
-              if (status === 'OK' && results[0]) resolve(results[0]);
-              else reject(new Error('Geocode failed'));
-            });
-          });
-          const loc = result.geometry.location;
-          return { name: result.formatted_address, coordinates: [loc.lng(), loc.lat()] };
-        } catch (err) { /* fall through */ }
+          const biasCoords = startLocation?.coordinates || [77.2090, 28.6139];
+          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${settings.mapboxKey}&proximity=${biasCoords[0]},${biasCoords[1]}&limit=1`;
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const f = data.features?.[0];
+            if (f) {
+              return { name: f.place_name, coordinates: f.geometry.coordinates };
+            }
+          }
+        } catch (err) {
+          console.warn('Mapbox Geocoder failed, falling back to Photon:', err);
+        }
       }
 
       try {
