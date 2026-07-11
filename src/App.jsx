@@ -497,8 +497,23 @@ export default function App() {
 
     const fetchUserData = async () => {
       setIsSyncingSettings(true);
+      
+      // Load fallback from localStorage first so settings load instantly
+      const localSettingsRaw = localStorage.getItem('tf_settings');
+      let localSettings = null;
+      if (localSettingsRaw) {
+        try {
+          localSettings = JSON.parse(localSettingsRaw);
+          if (localSettings) {
+            setSettings(prev => ({ ...prev, ...localSettings }));
+          }
+        } catch (e) {
+          console.warn('Failed to parse local settings:', e);
+        }
+      }
+
       try {
-        // 1. Fetch user settings
+        // 1. Fetch user settings from Supabase
         const { data: settingsData, error: settingsError } = await supabase
           .from('user_settings')
           .select('*')
@@ -517,32 +532,46 @@ export default function App() {
             aiProvider: settingsData.ai_provider || 'gemini',
             aiKey: (settingsData.ai_key || '').trim(),
           };
-          setSettings(loadedSettings);
-          localStorage.setItem('tf_theme', loadedSettings.theme);
+          
+          // Merge Supabase settings, falling back to local storage if DB fields are empty
+          const finalSettings = {
+            theme: loadedSettings.theme,
+            googleMapsKey: loadedSettings.googleMapsKey || localSettings?.googleMapsKey || '',
+            mapboxKey: loadedSettings.mapboxKey || localSettings?.mapboxKey || '',
+            tomtomKey: loadedSettings.tomtomKey || localSettings?.tomtomKey || '',
+            openWeatherKey: loadedSettings.openWeatherKey || localSettings?.openWeatherKey || '',
+            aiProvider: loadedSettings.aiProvider || localSettings?.aiProvider || 'gemini',
+            aiKey: loadedSettings.aiKey || localSettings?.aiKey || '',
+          };
+
+          setSettings(finalSettings);
+          localStorage.setItem('tf_theme', finalSettings.theme);
+          localStorage.setItem('tf_settings', JSON.stringify(finalSettings));
         } else {
           // No settings found, create new default settings row in Supabase
-          // We initialize with empty keys for the new user session
           const defaultSettings = {
             user_id: user.id,
             theme: localStorage.getItem('tf_theme') || 'dark',
-            google_maps_key: '',
-            mapbox_key: '',
-            tomtom_key: '',
-            open_weather_key: '',
-            ai_provider: 'gemini',
-            ai_key: '',
+            google_maps_key: localSettings?.googleMapsKey || '',
+            mapbox_key: localSettings?.mapboxKey || '',
+            tomtom_key: localSettings?.tomtomKey || '',
+            open_weather_key: localSettings?.openWeatherKey || '',
+            ai_provider: localSettings?.aiProvider || 'gemini',
+            ai_key: localSettings?.aiKey || '',
           };
           await supabase.from('user_settings').insert([defaultSettings]);
           
-          setSettings({
+          const finalSettings = {
             theme: defaultSettings.theme,
-            googleMapsKey: '',
-            mapboxKey: '',
-            tomtomKey: '',
-            openWeatherKey: '',
-            aiProvider: 'gemini',
-            aiKey: '',
-          });
+            googleMapsKey: defaultSettings.google_maps_key,
+            mapboxKey: defaultSettings.mapbox_key,
+            tomtomKey: defaultSettings.tomtom_key,
+            openWeatherKey: defaultSettings.open_weather_key,
+            aiProvider: defaultSettings.ai_provider,
+            aiKey: defaultSettings.ai_key,
+          };
+          setSettings(finalSettings);
+          localStorage.setItem('tf_settings', JSON.stringify(finalSettings));
         }
 
         // 2. Fetch search history
@@ -916,8 +945,8 @@ export default function App() {
     };
 
     setSettings(trimmedSettings);
-    setIsGmapsAuthError(false);
     localStorage.setItem('tf_theme', trimmedSettings.theme);
+    localStorage.setItem('tf_settings', JSON.stringify(trimmedSettings)); // Save locally immediately
 
     if (user) {
       try {
