@@ -281,7 +281,7 @@ const Sidebar = forwardRef(function Sidebar({
           </div>
         </div>
 
-        {/* Premium User Profile Section */}
+        {/* User Profile Section */}
         <div style={styles.userSection}>
           <div style={styles.avatarWrap}>
             {user?.user_metadata?.avatar_url ? (
@@ -293,7 +293,6 @@ const Sidebar = forwardRef(function Sidebar({
             ) : (
               <div style={styles.avatarInitial}>{userInitial}</div>
             )}
-            <div style={styles.onlineDot} />
           </div>
           <div style={styles.userInfo}>
             <span style={styles.userName}>{userDisplayName}</span>
@@ -302,10 +301,6 @@ const Sidebar = forwardRef(function Sidebar({
             </span>
           </div>
           <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <div style={styles.premiumBadge}>
-              <Zap size={10} style={{ color: '#f59e0b' }} />
-              <span>PRO</span>
-            </div>
             <button onClick={onLogout} className="logout-btn" title="Sign Out">
               <LogOut size={15} />
             </button>
@@ -774,7 +769,7 @@ const styles = {
   avatarImg: {
     width: '40px',
     height: '40px',
-    borderRadius: '12px',
+    borderRadius: '50%',
     border: '2px solid rgba(99,102,241,0.4)',
     objectFit: 'cover',
     boxShadow: '0 0 12px rgba(99,102,241,0.3)',
@@ -782,7 +777,7 @@ const styles = {
   avatarInitial: {
     width: '40px',
     height: '40px',
-    borderRadius: '12px',
+    borderRadius: '50%',
     background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
     color: '#fff',
     display: 'flex',
