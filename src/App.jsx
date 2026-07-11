@@ -1049,6 +1049,24 @@ export default function App() {
         let mapboxErrorMsg = null;
         let isNoRouteError = false;
 
+        // Resolve "My Current Location" to actual GPS coordinates first
+        if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
+          if (navMarkerPosRef.current) {
+            start = navMarkerPosRef.current;
+          } else {
+            try {
+              const freshPos = await new Promise((resolve, reject) => {
+                navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
+              });
+              start = [freshPos.coords.longitude, freshPos.coords.latitude];
+            } catch (err) {
+              console.warn('Could not fetch fresh GPS coordinates for routing:', err);
+            }
+          }
+        }
+
+        const end = destination.coordinates;
+
         // 🧠 AI PRE-ROUTE VALIDATION: Ask AI if this route is geographically possible before drawing paths
         if (settings.aiKey) {
           try {
@@ -1057,6 +1075,8 @@ export default function App() {
               apiKey: settings.aiKey,
               startName: startLocation?.name || 'My Location',
               destinationName: destination.name,
+              startCoords: start,
+              destCoords: end,
               travelMode
             });
             
@@ -1071,24 +1091,6 @@ export default function App() {
           }
         }
 
-
-      // If start is "My Current Location", use the latest tracked GPS coordinates if available
-      if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
-        if (navMarkerPosRef.current) {
-          start = navMarkerPosRef.current;
-        } else {
-          try {
-            const freshPos = await new Promise((resolve, reject) => {
-              navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000, enableHighAccuracy: true });
-            });
-            start = [freshPos.coords.longitude, freshPos.coords.latitude];
-          } catch (err) {
-            console.warn('Could not fetch fresh GPS coordinates for routing:', err);
-          }
-        }
-      }
-
-      const end = destination.coordinates;
 
       /**
        * Ensure the route polyline starts exactly at `start` and ends exactly at `end`.

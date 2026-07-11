@@ -290,6 +290,8 @@ export async function checkRoutePossibilityWithAI({
   apiKey,
   startName,
   destinationName,
+  startCoords,
+  destCoords,
   travelMode
 }) {
   if (!apiKey) {
@@ -297,8 +299,8 @@ export async function checkRoutePossibilityWithAI({
   }
 
   const prompt = `Task: Geographically validate if a road/land travel route is physically possible between these locations.
-Start Location: "${startName}"
-Destination: "${destinationName}"
+Start Location: "${startName}" (Coordinates [lng, lat]: ${startCoords ? startCoords.join(', ') : 'Unknown'})
+Destination: "${destinationName}" (Coordinates [lng, lat]: ${destCoords ? destCoords.join(', ') : 'Unknown'})
 Travel Mode: "${travelMode}"
 
 Is it physically possible to travel between these two locations by road/land? (e.g. they must be on the same landmass/continent, not separated by oceans where no road bridge/tunnel exists).
