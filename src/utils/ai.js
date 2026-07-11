@@ -284,3 +284,93 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
     return mockDecision();
   }
 }
+
+export async function checkRoutePossibilityWithAI({
+  provider,
+  apiKey,
+  startName,
+  destinationName,
+  travelMode
+}) {
+  if (!apiKey) {
+    return { possible: true, reason: '' };
+  }
+
+  const prompt = `Task: Geographically validate if a road/land travel route is physically possible between these locations.
+Start Location: "${startName}"
+Destination: "${destinationName}"
+Travel Mode: "${travelMode}"
+
+Is it physically possible to travel between these two locations by road/land? (e.g. they must be on the same landmass/continent, not separated by oceans where no road bridge/tunnel exists).
+
+Format your response strictly as a JSON object, containing:
+1. "possible": true or false
+2. "reason": A single concise sentence (max 15 words) in simple English explaining why it is possible or why it is impossible.
+
+Response JSON format:
+{
+  "possible": false,
+  "reason": "Start and destination are separated by the Atlantic Ocean."
+}
+Return ONLY the raw JSON. Do not include markdown code block formatting (like \`\`\`json) or any other text.`;
+
+  try {
+    incrementApiUsage('ai');
+    let jsonText = '';
+    if (provider === 'gemini') {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              maxOutputTokens: 120,
+              temperature: 0.1,
+              responseMimeType: "application/json"
+            },
+          }),
+        }
+      );
+      const data = await response.json();
+      if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+        jsonText = data.candidates[0].content.parts[0].text.trim();
+      } else {
+        throw new Error('Empty response from Gemini');
+      }
+    } else if (provider === 'openai') {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          response_format: { type: "json_object" },
+          messages: [{ role: 'user', content: prompt }],
+          max_tokens: 120,
+          temperature: 0.1,
+        }),
+      });
+      const data = await response.json();
+      jsonText = data.choices[0].message.content.trim();
+    } else {
+      return { possible: true, reason: '' };
+    }
+
+    if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+    }
+    const result = JSON.parse(jsonText);
+    return {
+      possible: result.possible === true || result.possible === 'true',
+      reason: result.reason || 'AI Routing Guard: Route is impossible.'
+    };
+  } catch (error) {
+    console.error('AI Route Possibility error:', error);
+    return { possible: true, reason: '' };
+  }
+}
+

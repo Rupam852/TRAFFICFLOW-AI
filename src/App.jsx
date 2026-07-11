@@ -8,7 +8,7 @@ import SettingsModal from './components/SettingsModal';
 import ShareEtaModal from './components/ShareEtaModal';
 import { Menu, X, Map } from 'lucide-react';
 import { incrementApiUsage } from './utils/usage';
-import { evaluateRouteSelectionWithAI } from './utils/ai';
+import { evaluateRouteSelectionWithAI, checkRoutePossibilityWithAI } from './utils/ai';
 
 // Speed (km/h) per travel mode — used for mock route duration estimation
 const modeSpeed = { car: 50, motorbike: 65, bicycle: 18, walk: 5 };
@@ -1048,6 +1048,29 @@ export default function App() {
         let start = startLocation?.coordinates || [77.2090, 28.6139]; // CP New Delhi
         let mapboxErrorMsg = null;
         let isNoRouteError = false;
+
+        // 🧠 AI PRE-ROUTE VALIDATION: Ask AI if this route is geographically possible before drawing paths
+        if (settings.aiKey) {
+          try {
+            const aiValidation = await checkRoutePossibilityWithAI({
+              provider: settings.aiProvider,
+              apiKey: settings.aiKey,
+              startName: startLocation?.name || 'My Location',
+              destinationName: destination.name,
+              travelMode
+            });
+            
+            if (!aiValidation.possible) {
+              setRouteOptions([]);
+              setRoutingError(`AI Routing Guard: ${aiValidation.reason}`);
+              setIsRoutesLoading(false);
+              return;
+            }
+          } catch (aiErr) {
+            console.warn("AI pre-route validation failed, falling back to engine checks:", aiErr);
+          }
+        }
+
 
       // If start is "My Current Location", use the latest tracked GPS coordinates if available
       if (startLocation?.name === 'My Current Location' || startLocation?.name?.startsWith('My Current Location')) {
