@@ -88,8 +88,8 @@ export default function MapView({
     if (timeOfDay === 'night') {
       return 'mapbox://styles/mapbox/dark-v11';
     }
-    // For day, sunrise, and sunset
-    return settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/dark-v11';
+    // For day, sunrise, and sunset, use the classic, highly legible Mapbox Streets style (soothing but easy to read)
+    return settings.theme === 'light' ? 'mapbox://styles/mapbox/streets-v12' : 'mapbox://styles/mapbox/dark-v11';
   };
 
   // Initialize Mapbox GL JS map
