@@ -1713,6 +1713,8 @@ export default function App() {
       currentIndex++;
       if (currentIndex >= geometry.length) {
         stopRouteSimulation();
+        setShowArrivalToast(true);
+        setTimeout(() => setShowArrivalToast(false), 7000);
         return;
       }
 
