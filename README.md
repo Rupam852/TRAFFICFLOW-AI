@@ -3,14 +3,13 @@
 [![Vite](https://img.shields.io/badge/Vite-B73BFE?style=for-the-badge&logo=vite&logoColor=FFD62B)](https://vite.dev/)
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://react.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-1C1C1C?style=for-the-badge&logo=supabase&logoColor=3ECF8E)](https://supabase.com/)
-[![Google Maps](https://img.shields.io/badge/Google%20Maps-4285F4?style=for-the-badge&logo=googlemaps&logoColor=white)](https://developers.google.com/maps)
 [![Mapbox](https://img.shields.io/badge/Mapbox-000000?style=for-the-badge&logo=mapbox&logoColor=white)](https://www.mapbox.com/)
 [![TomTom](https://img.shields.io/badge/TomTom-FF3300?style=for-the-badge&logo=tomtom&logoColor=white)](https://developer.tomtom.com/)
 [![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://vercel.com/)
 
 > **Live Demo**: [trafficflowai.vercel.app](https://trafficflowai.vercel.app)
 
-TrafficFlow AI is a professional-grade, state-of-the-art navigation web application that merges advanced multi-provider route optimization with real-time GPS simulation, live weather mechanics, and an integrated AI Cognitive Advisor. Built using React, Vite, and Supabase, it offers a premium user experience featuring modern glassmorphic panels, dynamic weather canvases, and precise road-snapping turn-by-turn navigation.
+TrafficFlow AI is a professional-grade, state-of-the-art navigation web application that merges advanced Mapbox-based route optimization with real-time GPS simulation, live weather mechanics, and an integrated AI Cognitive Advisor. Built using React, Vite, and Supabase, it offers a premium user experience featuring modern glassmorphic panels, dynamic weather canvases, and precise road-snapping turn-by-turn navigation.
 
 ---
 
@@ -24,23 +23,26 @@ TrafficFlow AI is a professional-grade, state-of-the-art navigation web applicat
 
 ## 🚀 Key Features
 
-### 1. 🗺️ Multi-Provider Route Engine & Intelligent Fallbacks
-- **Primary Engine**: Google Maps Directions Service (client-side) for accurate real road geometry.
-- **Auto Fallback Chain**: If Google Maps fails, automatically retries Mapbox Directions API → OSRM (OpenStreetMap Routing) → Dynamic Simulation Mode.
-- **3 Alternative Routes**: Fastest Route (Best Recommended), Alternative Route (Balanced/Bypass), Via City Roads (Urban streets).
-- **Single Selected Path Focus**: Only the currently selected route is drawn — keeps map clean and uncluttered.
-- **Real-time Traffic Updates**: TomTom Live Traffic API polls every 60 seconds to update route durations and congestion labels.
+### 1. 🗺️ Mapbox GL JS Integration & Intelligent Fallbacks
+- **Primary Engine**: Mapbox GL JS (`mapbox-gl`) for high-fidelity 3D map rendering, smooth rotation, and custom HTML markers.
+- **Dynamic Style Syncing**: Automatically switches map styles based on theme and Climate Engine controls:
+  - **Day Mode (Light)**: Clean, high-legibility `mapbox://styles/mapbox/streets-v12` map.
+  - **Night Mode (Dark)**: Sleek, eye-soothing `mapbox://styles/mapbox/dark-v11` map.
+- **Alternative Routes**: Computes up to 3 alternative paths: Fastest Route (Best Recommended), Alternative Route (Balanced/Bypass), and Via City Roads (Urban streets).
+- **Auto Fallback Chain**: If Mapbox directions API fail, the system automatically falls back to OpenSource Routing Machine (OSRM) -> local simulated geometry.
+- **Single Selected Path Focus**: Draws only the currently selected active route, keeping the map visual clean and uncluttered.
+- **Real-time Traffic Updates**: TomTom Live Traffic API integration polls every 60 seconds to update congestion labels and ETA multipliers.
 
 ### 2. 📍 Professional GPS Navigation HUD & Road Snapping
 - **Live GPS Tracking**: Uses browser Geolocation API to track the user's position in real-time on the map.
 - **Road Snapping**: Raw GPS coordinates are snapped to the nearest point on route geometry, preventing drift off-road.
 - **Directional Bearing Arrow**: Calculates heading in degrees `[0, 360)` and rotates a premium navigation cursor to face the direction of travel.
 - **Arrival Detection**: Detects when user enters within 300m of destination and shows a celebration toast.
-- **Route Simulation Mode**: Animated auto-drive simulation along the computed route geometry — useful for demo & testing.
+- **Route Simulation Mode**: Animated auto-drive simulation along the computed route geometry, complete with auto-camera following, 3D tilt, dynamic bearing alignment, and an arrival toast completion handler.
 
 ### 3. 🔍 Integrated Places Search & Autocomplete
-- **Google Places Autocomplete** as primary provider (with bias to proximity of current location).
-- **Fallback chain**: Mapbox Geocoding → TomTom Search → Komoot Photon (free, OSM-based).
+- **Mapbox Geocoding API** as primary provider for fast, localized search with proximity bias based on current location.
+- **Fallback Chain**: Photon API (free, OpenStreetMap-based geocoding) for high-availability lookup.
 - **Search History**: Last 5 destinations are saved per user in Supabase and shown in the sidebar for quick re-access.
 - **Map Click Geocoding**: Long-tap/click anywhere on the map to set a destination directly.
 
@@ -52,30 +54,22 @@ TrafficFlow AI is a professional-grade, state-of-the-art navigation web applicat
 
 ### 5. 🤖 AI Cognitive Advisor
 - A dedicated sidebar tab powered by your choice of LLM:
-  - **Google Gemini** (gemini-2.0-flash)
+  - **Google Gemini** (gemini-2.5-flash / gemini-2.0-flash)
   - **OpenAI** (gpt-4o / gpt-3.5-turbo)
-  - **Anthropic Claude** (claude-3-haiku)
-- Automatically reads your start location, destination, travel mode, and route parameters to generate intelligent traffic analysis, ETA predictions, and navigation tips.
+- **Rich Text / Markdown Support**: Automatically parses `**bold**` headers and parameters into styled bold badges for a sleek presentation.
+- **Context-Aware Recommendations**: Automatically reads your start location, destination, travel mode, and route parameters to generate intelligent traffic analysis, ETA predictions, and navigation tips.
 
 ### 6. 🔐 Authentication & User Profiles
 - **Email/Password Auth** with email verification via Supabase GoTrue.
 - **Google OAuth** one-click sign-in.
-- **Settings Modal**: Authenticated users can save their private API keys (Google Maps, Mapbox, TomTom, OpenWeather, AI) to their cloud profile via Supabase RLS.
-- **Sign Out Confirmation Dialog**: Prevents accidental session termination.
+- **Settings Modal**: Authenticated users can save their private API keys (Mapbox Access Token, TomTom, OpenWeather, AI API keys) to their cloud profile via Supabase RLS.
+- **Local Cache Fallback**: Saves credentials to `localStorage` immediately upon update, ensuring the app loads key configs instantly on page refresh.
 
 ### 7. 📱 Mobile-First Responsive Design
 - Fully responsive across desktop, tablet, and mobile viewports.
 - Sidebar collapses into a bottom slide-over drawer on mobile with backdrop tap-to-close.
 - Weather trigger button collapses to an icon-only pill on narrow screens.
-- Map controls stack reorganizes and shrinks for touch-friendly tap targets.
-- **Layered Back-Gesture Navigation**: On Android/iOS browsers, pressing back closes the active panel/modal first (Settings → Share ETA → Weather Panel → Suggestions → Sidebar → AI Tab → Simulation → POIs → Route), and only shows an "Exit App?" confirmation when the workspace is fully idle.
-
-### 8. 🎨 Premium UX & Design System
-- **Glassmorphism Design**: `backdrop-filter: blur` panels with subtle gradient borders and inner glow.
-- **Smooth Micro-Animations**: `slideUp`, `fadeIn`, CSS keyframe transitions on all modals, toasts, and cards.
-- **Dynamic Scrollbar**: Scrollbars are hidden by default and appear only while the user is actively scrolling.
-- **Custom Favicon**: Premium dark-mode navigation icon (64px, 192px, 512px — Apple Touch Icon support).
-- **Share Journey ETA**: Share your estimated arrival time and destination details with a link.
+- **Layered Back-Gesture Navigation**: On mobile browsers, pressing the back button closes active UI elements step-by-step (Modals → Weather Panel → Suggestions → Sidebar) before prompting to exit the app.
 
 ---
 
@@ -87,13 +81,12 @@ TrafficFlow AI is a professional-grade, state-of-the-art navigation web applicat
 | **Styling** | Vanilla CSS — Design Tokens, CSS Variables, Glassmorphism, Micro-animations |
 | **Icons** | Lucide React |
 | **Database & Auth** | Supabase (PostgreSQL, GoTrue, Google OAuth, Row Level Security) |
-| **Mapping** | Google Maps JavaScript SDK (Places + Geocoding + Directions) |
-| **Routing Fallback 1** | Mapbox Directions API |
-| **Routing Fallback 2** | OSRM (Open Source Routing Machine — free, no key) |
-| **Routing Fallback 3** | Dynamic Simulation Mode (local interpolation) |
+| **Mapping Engine** | Mapbox GL JS (`mapbox-gl`) |
+| **Routing Engines** | Mapbox Directions API & OSRM (Open Source Routing Machine) |
+| **Geocoding Search** | Mapbox Geocoding API & Photon (OpenStreetMap geocoding fallback) |
 | **Live Traffic** | TomTom Traffic Flow API (optional) |
 | **Live Weather** | OpenWeatherMap API (optional) |
-| **AI Advisor** | Google Gemini / OpenAI / Anthropic Claude |
+| **AI Advisor** | Google Gemini & OpenAI |
 | **Hosting** | Vercel (Edge Network, Serverless Functions) |
 
 ---
@@ -107,7 +100,6 @@ Create the following tables in your Supabase project's **SQL Editor**:
 CREATE TABLE IF NOT EXISTS public.user_settings (
     user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     theme TEXT DEFAULT 'dark',
-    google_maps_key TEXT DEFAULT '',
     mapbox_key TEXT DEFAULT '',
     tomtom_key TEXT DEFAULT '',
     open_weather_key TEXT DEFAULT '',
@@ -147,7 +139,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anonymous-key
 ```
 
 > [!WARNING]
-> **Never commit personal API Keys** (Google Maps, Mapbox, TomTom, OpenWeatherMap, Gemini/OpenAI) to your repository. TrafficFlow AI provides a secure in-app **Settings Modal** where authenticated users can input and save their private keys — stored per user via Supabase RLS. Only the two Supabase public anon keys above belong in `.env`.
+> **Never commit personal API Keys** (Mapbox Access Token, TomTom, OpenWeatherMap, Gemini/OpenAI keys) to your GitHub repository. TrafficFlow AI provides a secure in-app **Settings Modal** where authenticated users can input and save their private keys — stored securely per user via Supabase RLS and cached locally in their browser.
 
 ---
 
@@ -156,7 +148,7 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anonymous-key
 ### Prerequisites
 - Node.js **v18+**
 - A [Supabase](https://supabase.com/) project with the tables above created
-- (Optional) API keys for Google Maps, Mapbox, TomTom, OpenWeatherMap, and an AI provider
+- A Mapbox Access Token (Optional but required for map visualization)
 
 ### Steps
 
@@ -204,7 +196,7 @@ TRAFFICFLOW-AI/
 │   │   ├── AiPanel.jsx       # AI Cognitive Advisor panel
 │   │   ├── Auth.jsx          # Login / Sign Up screens
 │   │   ├── LandingPage.jsx   # Public landing page
-│   │   ├── MapView.jsx       # Google Maps canvas + overlays
+│   │   ├── MapView.jsx       # Mapbox GL JS canvas + overlays
 │   │   ├── SettingsModal.jsx # API key configuration modal
 │   │   ├── ShareEtaModal.jsx # Journey share modal
 │   │   └── Sidebar.jsx       # Navigation sidebar panel
@@ -241,13 +233,11 @@ TrafficFlow AI is optimized for zero-configuration deployment on [Vercel](https:
 
 | Service | Purpose | Required? | Free Tier |
 |---|---|---|---|
-| [Google Maps JS API](https://developers.google.com/maps) | Map rendering, Places autocomplete, Geocoding, Directions | ✅ Required | $200/month credit |
-| [Mapbox](https://www.mapbox.com/) | Route geometry fallback, Geocoding fallback | ✅ Required | 50,000 loads/month |
+| [Mapbox](https://www.mapbox.com/) | Map rendering, Places autocomplete, Directions routing | ✅ Required | 50,000 loads/month |
 | [TomTom](https://developer.tomtom.com/) | Live traffic flow data | ⚡ Optional | 2,500 requests/day |
 | [OpenWeatherMap](https://openweathermap.org/api) | Live weather & day/night sync | ⚡ Optional | 1,000 requests/day |
 | [Google Gemini](https://ai.google.dev/) | AI Cognitive Advisor (default) | ⚡ Optional | Free tier available |
 | [OpenAI](https://platform.openai.com/) | AI Cognitive Advisor (alternative) | ⚡ Optional | Pay-per-use |
-| [Anthropic Claude](https://www.anthropic.com/) | AI Cognitive Advisor (alternative) | ⚡ Optional | Pay-per-use |
 
 ---
 

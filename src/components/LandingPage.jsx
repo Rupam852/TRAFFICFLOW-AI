@@ -53,7 +53,7 @@ export default function LandingPage({ onNavigate }) {
   const faqs = [
     {
       q: 'Do I need my own API keys to use TrafficFlow AI?',
-      a: 'Yes, to query maps and compute live routes, you must configure your own Google Maps and Mapbox keys in the app settings. Keyless simulation mode is disabled to ensure direct, unthrottled provider access.'
+      a: 'Yes, to query maps and compute live routes, you must configure your own Mapbox Access Token in the app settings. Keyless simulation mode is disabled to ensure direct, unthrottled provider access.'
     },
     {
       q: 'How does the AI assistant optimize my routes?',
@@ -61,7 +61,7 @@ export default function LandingPage({ onNavigate }) {
     },
     {
       q: 'Are my API keys stored securely?',
-      a: 'Absolutely. Your keys are stored strictly in your local browser cache (localStorage) or inside your private Supabase user_settings row. They are never sent to third-party endpoints other than directly to Mapbox, Google, or TomTom.'
+      a: 'Absolutely. Your keys are stored strictly in your local browser cache (localStorage) or inside your private Supabase user_settings row. They are never sent to third-party endpoints other than directly to Mapbox or TomTom.'
     },
     {
       q: 'Can I simulate routes in real time?',
@@ -187,7 +187,7 @@ export default function LandingPage({ onNavigate }) {
           <div className="landing-step-item">
             <div style={styles.stepNumber}>02</div>
             <h3 style={styles.stepTitle}>Configure API Keys</h3>
-            <p style={styles.stepDesc}>Add Mapbox, Google Maps, or Weather keys. Your keys stay secure in local cache or private rows.</p>
+            <p style={styles.stepDesc}>Add Mapbox, TomTom, or Weather keys. Your keys stay secure in local cache or private database rows.</p>
           </div>
           <div className="landing-step-divider" />
           <div className="landing-step-item">
@@ -212,7 +212,7 @@ export default function LandingPage({ onNavigate }) {
               <h3 style={styles.limitationTitle}>Mandatory Custom API Credentials</h3>
             </div>
             <p style={styles.limitationText}>
-              Direct integration with Google Maps and Mapbox is required to load map views and draw route geometries. Public keys are disabled to avoid service throttling.
+              Direct integration with Mapbox GL JS is required to load interactive map views and calculate route geometries. Public keys are disabled to avoid service throttling.
             </p>
           </div>
 
@@ -340,7 +340,7 @@ export default function LandingPage({ onNavigate }) {
               <div className="privacy-modal-section">
                 <h3 className="privacy-modal-sectitle">1. Information We Collect</h3>
                 <p className="privacy-modal-text">
-                  TrafficFlow AI collects minimal personal information. If you create an account, we store your email address and account credentials securely. Your API keys (Google Maps, Mapbox, OpenWeather) are stored strictly on your local browser cache (localStorage) or inside your private, encrypted database row in Supabase.
+                  TrafficFlow AI collects minimal personal information. If you create an account, we store your email address and account credentials securely. Your API keys (Mapbox, TomTom, OpenWeather) are stored strictly on your local browser cache (localStorage) or inside your private, encrypted database row in Supabase.
                 </p>
               </div>
 
@@ -354,7 +354,7 @@ export default function LandingPage({ onNavigate }) {
               <div className="privacy-modal-section">
                 <h3 className="privacy-modal-sectitle">3. Third-Party Integrations</h3>
                 <p className="privacy-modal-text">
-                  Routing and maps are powered by third-party APIs (Google Maps, Mapbox, TomTom, OpenStreetMap, and OpenWeatherMap). Your usage is governed by their respective privacy policies.
+                  Routing and maps are powered by third-party APIs (Mapbox, TomTom, OpenStreetMap, and OpenWeatherMap). Your usage is governed by their respective privacy policies.
                 </p>
               </div>
 
