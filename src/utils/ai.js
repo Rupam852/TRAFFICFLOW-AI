@@ -6,6 +6,24 @@
 
 import { incrementApiUsage } from './usage';
 
+// Local fetch helper with timeout to prevent hanging UI
+async function fetchWithTimeout(resource, options = {}) {
+  const { timeout = 8000 } = options;
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  try {
+    const response = await fetch(resource, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(id);
+    return response;
+  } catch (error) {
+    clearTimeout(id);
+    throw error;
+  }
+}
+
 export async function generateAiRouteAnalysis({
   provider,
   apiKey,
@@ -40,10 +58,11 @@ Provide a concise, professional analysis (max 3 short paragraphs):
   try {
     incrementApiUsage('ai'); // Track real API usage
     if (provider === 'gemini') {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
+          timeout: 8000,
           headers: {
             'Content-Type': 'application/json',
           },
@@ -72,8 +91,9 @@ Provide a concise, professional analysis (max 3 short paragraphs):
     } 
     
     else if (provider === 'openai') {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
+        timeout: 8000,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
@@ -226,10 +246,11 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
     incrementApiUsage('ai');
     let jsonText = '';
     if (provider === 'gemini') {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
+          timeout: 8000,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
@@ -248,8 +269,9 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
         throw new Error('Empty response from Gemini');
       }
     } else if (provider === 'openai') {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
+        timeout: 8000,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
@@ -320,10 +342,11 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
     incrementApiUsage('ai');
     let jsonText = '';
     if (provider === 'gemini') {
-      const response = await fetch(
+      const response = await fetchWithTimeout(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
+          timeout: 8000,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
@@ -346,8 +369,9 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
       }
 
     } else if (provider === 'openai') {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
+        timeout: 8000,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${apiKey}`,
