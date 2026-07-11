@@ -2084,7 +2084,7 @@ export default function App() {
       )}
 
       {/* API Key Setup Guide — shown to new users and locks the app if keys are missing */}
-      {(!settings.googleMapsKey || !settings.mapboxKey) && !showWarningOnLogin && !dismissedKeySetup && !isSyncingSettings && (
+      {!settings.mapboxKey && !showWarningOnLogin && !dismissedKeySetup && !isSyncingSettings && (
         <div style={{ ...styles.disclaimerBackdrop, backdropFilter: 'blur(16px)', backgroundColor: 'rgba(15, 23, 42, 0.9)' }}>
           <div className="glass-panel" style={{ ...styles.disclaimerCard, maxWidth: '520px', textAlign: 'left', gap: '0', position: 'relative' }}>
             <button
