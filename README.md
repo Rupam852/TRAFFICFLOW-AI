@@ -17,7 +17,8 @@ TrafficFlow AI is a professional-grade, state-of-the-art navigation web applicat
 
 | Landing Page | Map Dashboard |
 |---|---|
-| Premium landing page with hero section, features grid, FAQ accordion, and footer | Logged-in map dashboard with sidebar navigation, route options, weather widget, and AI advisor |
+| ![Landing Page](public/screenshots/landing_page.png) | ![Map Dashboard](public/screenshots/dashboard.png) |
+
 
 ---
 
