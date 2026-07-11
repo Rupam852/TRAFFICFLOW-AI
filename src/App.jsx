@@ -1087,14 +1087,11 @@ export default function App() {
               return;
             }
           } catch (aiErr) {
-            console.error("AI pre-route validation failed:", aiErr);
-            setRouteOptions([]);
-            setRoutingError(`AI Validation Error: ${aiErr.message || 'AI Key authentication failed.'}`);
-            setIsRoutesLoading(false);
-            return;
+            console.warn("AI pre-route validation failed (quota limits or key restrictions). Proceeding with standard routing checks.", aiErr);
+            // Non-blocking fallback: Do NOT block routing if user's AI key runs out of quota.
           }
-
         }
+
 
 
       /**
