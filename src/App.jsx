@@ -1087,8 +1087,13 @@ export default function App() {
               return;
             }
           } catch (aiErr) {
-            console.warn("AI pre-route validation failed, falling back to engine checks:", aiErr);
+            console.error("AI pre-route validation failed:", aiErr);
+            setRouteOptions([]);
+            setRoutingError(`AI Validation Error: ${aiErr.message || 'AI Key authentication failed.'}`);
+            setIsRoutesLoading(false);
+            return;
           }
+
         }
 
 

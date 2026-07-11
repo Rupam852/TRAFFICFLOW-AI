@@ -41,7 +41,7 @@ Provide a concise, professional analysis (max 3 short paragraphs):
     incrementApiUsage('ai'); // Track real API usage
     if (provider === 'gemini') {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: {
@@ -227,7 +227,7 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
     let jsonText = '';
     if (provider === 'gemini') {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -321,7 +321,7 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
     let jsonText = '';
     if (provider === 'gemini') {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -362,9 +362,13 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
       return { possible: true, reason: '' };
     }
 
-    if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/^```json\s*/, '').replace(/```$/, '').trim();
+    // Robust extraction: isolate everything between first '{' and last '}' to bypass markdown headers or codeblock wraps
+    const jsonStart = jsonText.indexOf('{');
+    const jsonEnd = jsonText.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd !== -1) {
+      jsonText = jsonText.substring(jsonStart, jsonEnd + 1);
     }
+    
     const result = JSON.parse(jsonText);
     return {
       possible: result.possible === true || result.possible === 'true',
@@ -372,7 +376,7 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
     };
   } catch (error) {
     console.error('AI Route Possibility error:', error);
-    return { possible: true, reason: '' };
+    throw new Error(error.message || 'AI engine failed to parse route coordinates.');
   }
 }
 
