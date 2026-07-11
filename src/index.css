@@ -6,11 +6,11 @@
   --font-heading: 'Outfit', var(--font-sans);
 
   /* Light Theme Variables */
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-tertiary: #f1f5f9;
-  --bg-glass: rgba(255, 255, 255, 0.7);
-  --bg-glass-hover: rgba(255, 255, 255, 0.85);
+  --bg-primary: #f1f5f9;      /* Cool slate grey instead of blinding white */
+  --bg-secondary: #f8fafc;    /* Soft off-white for cards */
+  --bg-tertiary: #e2e8f0;     /* Soft border contrast */
+  --bg-glass: rgba(241, 245, 249, 0.78); /* Soft slate glassmorphism */
+  --bg-glass-hover: rgba(241, 245, 249, 0.9);
   
   --text-primary: #0f172a;
   --text-secondary: #475569;
