@@ -336,11 +336,15 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
         }
       );
       const data = await response.json();
+      if (data.error) {
+        throw new Error(data.error.message || `Gemini API error code ${data.error.code}`);
+      }
       if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
         jsonText = data.candidates[0].content.parts[0].text.trim();
       } else {
-        throw new Error('Empty response from Gemini');
+        throw new Error('Empty response from Gemini (Verify prompt safety or key restrictions).');
       }
+
     } else if (provider === 'openai') {
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
