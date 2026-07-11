@@ -61,7 +61,7 @@ const generateDynamicMockRoutes = (start, end, travelMode) => {
   const baseSpeed  = modeSpeed[travelMode] || 50;
   const dur1 = Math.max(1, (distKm / baseSpeed) * 60);                  // express
   const dur2 = Math.max(1, (distKm * 1.2) / (baseSpeed * 0.85) * 60);  // bypass
-  const dur3 = Math.max(1, (distKm * 0.95) / (baseSpeed * 0.65) * 60); // city streets
+  const dur3 = Math.max(1, (distKm * 1.15) / (baseSpeed * 0.80) * 60); // city streets (Bug 9 fix: was 0.95/0.65 — shorter dist but impossible slow speed)
 
   // Helper to generate a realistic winding curve between start and end
   const generateCurvedPath = (p0, p2, offsetDirection = 0) => {
@@ -126,7 +126,7 @@ const generateDynamicMockRoutes = (start, end, travelMode) => {
     },
     {
       name: 'Via City Roads',
-      distance: (distKm * 0.95).toFixed(1) + ' km',
+      distance: (distKm * 1.15).toFixed(1) + ' km',  // Bug 9 fix: longer distance makes sense for city detour
       duration: fmtDur(dur3),
       geometry: route3Geom,
       trafficStatus: 'heavy',
@@ -894,20 +894,18 @@ export default function App() {
   }, []);
 
   // Arrival detection effect: runs whenever navMarkerPos or destination changes
+  // Bug 6 Fix: Only trigger if NOT in simulation (simulation has its own completion handler)
   useEffect(() => {
-    if (navMarkerPos && destination?.coordinates) {
+    if (navMarkerPos && destination?.coordinates && !isRouteSimulationActiveRef.current) {
       const dist = haversineMetres(navMarkerPos, destination.coordinates);
       if (dist <= 300) {
-        setTimeout(() => {
-          setShowArrivalToast(prev => {
-            if (!prev) {
-              // Auto dismiss toast after 7 seconds
-              setTimeout(() => setShowArrivalToast(false), 7000);
-              return true;
-            }
-            return prev;
-          });
-        }, 0);
+        setShowArrivalToast(prev => {
+          if (!prev) {
+            setTimeout(() => setShowArrivalToast(false), 7000);
+            return true;
+          }
+          return prev;
+        });
       }
     }
   }, [navMarkerPos, destination]);
@@ -958,8 +956,8 @@ export default function App() {
   const confirmLogout = async () => {
     setShowLogoutConfirm(false);
     await supabase.auth.signOut();
-    setUser(null);
-    handleNavigate('landing');
+    // Bug 13 Fix: Don't call handleNavigate here — onAuthStateChange already handles
+    // redirect to landing when session ends, avoiding duplicate history.pushState
   };
 
   const handleSaveSettings = async (newSettings) => {
@@ -1503,9 +1501,40 @@ export default function App() {
 
   }, [startLocation, destination, settings.mapboxKey, settings.tomtomKey, settings.aiProvider, settings.aiKey, gmapsLoaded, user, travelMode]);
 
-  // Real-time traffic tracking loop (updates every 15 seconds when route is active)
+  // Real-time traffic tracking loop (updates every 60 seconds when route is active)
   useEffect(() => {
     if (!destination) return;
+
+    // Bug 3 Fix: updateRouteWithTraffic defined BEFORE setInterval (const arrow functions are not hoisted)
+    const updateRouteWithTraffic = (status, delayInfo, factor) => {
+      setRouteOptions(prev => {
+        if (!prev || !prev[selectedRouteIndex]) return prev;
+        return prev.map((route, idx) => {
+          if (idx !== selectedRouteIndex) return route;
+
+          const distKm = parseFloat(route.distance.replace(/[^\d.]/g, ''));
+          const baseMins = route.durationMinutes && !isNaN(route.durationMinutes)
+            ? route.durationMinutes
+            : (!isNaN(distKm) ? (distKm / (modeSpeed[travelMode] || 50)) * 60 : null);
+
+          let newDuration = route.duration;
+          if (baseMins !== null) {
+            newDuration = fmtDur(baseMins * factor);
+          }
+
+          let updatedSegments = route.trafficSegments || [];
+          if (updatedSegments.length > 0) {
+            updatedSegments = updatedSegments.map((seg, sIdx) => {
+              if (status === 'smooth') return { ...seg, trafficStatus: 'smooth' };
+              const isCongestedSeg = sIdx === 1 || (sIdx === 2 && status === 'heavy');
+              return { ...seg, trafficStatus: isCongestedSeg ? status : 'smooth' };
+            });
+          }
+
+          return { ...route, trafficStatus: status, delayInfo: delayInfo, duration: newDuration, trafficSegments: updatedSegments };
+        });
+      });
+    };
 
     const interval = setInterval(async () => {
       // Get the currently selected route
@@ -1601,52 +1630,7 @@ export default function App() {
 
       updateRouteWithTraffic(newStatus, newDelayInfo, trafficFactor);
 
-    }, 60000); // run every 60 seconds (reduced from 15s to cut API token usage by 75%)
-
-    // Helper to update state reactively
-    const updateRouteWithTraffic = (status, delayInfo, factor) => {
-      setRouteOptions(prev => {
-        if (!prev || !prev[selectedRouteIndex]) return prev;
-        return prev.map((route, idx) => {
-          if (idx !== selectedRouteIndex) return route;
-
-          // Use the real base duration preserved from OSRM/Mapbox.
-          // Fall back to modeSpeed estimate only if durationMinutes is missing (pure mock routes).
-          const distKm = parseFloat(route.distance.replace(/[^\d.]/g, ''));
-          const baseMins = route.durationMinutes && !isNaN(route.durationMinutes)
-            ? route.durationMinutes
-            : (!isNaN(distKm) ? (distKm / (modeSpeed[travelMode] || 50)) * 60 : null);
-
-          let newDuration = route.duration; // keep existing if no base available
-          if (baseMins !== null) {
-            const newMins = baseMins * factor;
-            newDuration = fmtDur(newMins);
-          }
-
-          // Reactively update segment statuses so they are colored on the map
-          let updatedSegments = route.trafficSegments || [];
-          if (updatedSegments.length > 0) {
-            updatedSegments = updatedSegments.map((seg, sIdx) => {
-              if (status === 'smooth') {
-                return { ...seg, trafficStatus: 'smooth' };
-              } else {
-                // Conjugate: set specific segments as congested to simulate real-time maps
-                const isCongestedSeg = sIdx === 1 || (sIdx === 2 && status === 'heavy');
-                return { ...seg, trafficStatus: isCongestedSeg ? status : 'smooth' };
-              }
-            });
-          }
-
-          return {
-            ...route,
-            trafficStatus: status,
-            delayInfo: delayInfo,
-            duration: newDuration,
-            trafficSegments: updatedSegments
-          };
-        });
-      });
-    };
+    }, 60000); // run every 60 seconds
 
     return () => clearInterval(interval);
   }, [destination, selectedRouteIndex, travelMode, settings.tomtomKey]);
@@ -2342,7 +2326,7 @@ export default function App() {
             </div>
             <h3 style={styles.placeholderTitle}>Interactive Map View Disabled</h3>
             <p style={styles.placeholderText}>
-              To load 3D vector tile layouts, telemetry tracking, and dynamic routing navigation, please configure your own **Google Maps** and **Mapbox** credentials in the application settings modal.
+              To load 3D vector tile layouts, telemetry tracking, and dynamic routing navigation, please configure your own <strong>Google Maps</strong> and <strong>Mapbox</strong> credentials in the application settings modal.
             </p>
             <button
               className="glow-btn"

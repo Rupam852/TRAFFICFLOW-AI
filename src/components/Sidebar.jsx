@@ -17,6 +17,7 @@ const Sidebar = forwardRef(function Sidebar({
   searchHistory,
   onSelectHistory,
   onRemoveHistory,
+  onAmenitiesSearch,
   onOpenSettings,
   onLogout,
   user,
@@ -27,6 +28,10 @@ const Sidebar = forwardRef(function Sidebar({
   routingError,
   isRoutesLoading,
   isRouteSwitching,
+  gmapsLoaded,
+  isRouteSimulationActive,
+  onStartSimulation,
+  onStopSimulation,
   activeTab,
   setActiveTab
 }, ref) {
