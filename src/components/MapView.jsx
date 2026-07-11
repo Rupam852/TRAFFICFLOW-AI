@@ -82,6 +82,21 @@ export default function MapView({
     night: 'rgba(15, 23, 42, 0.45)',     // dark night
   };
 
+  // Helper to determine active Mapbox style based on theme and Climate Engine's Day-Night Cycle
+  const getActiveMapStyle = () => {
+    // If night is selected in Climate Engine, load navigation-night-v1
+    if (timeOfDay === 'night') {
+      return 'mapbox://styles/mapbox/navigation-night-v1';
+    }
+    // For day, sunrise, and sunset
+    if (settings.theme === 'light') {
+      return 'mapbox://styles/mapbox/light-v11';
+    } else {
+      // In dark theme, if user manually clicks "Day" in climate engine, show colorful day map
+      return 'mapbox://styles/mapbox/navigation-day-v1';
+    }
+  };
+
   // Initialize Mapbox GL JS map
   useEffect(() => {
     if (!settings.mapboxKey || !mapContainerRef.current) return;
@@ -89,7 +104,7 @@ export default function MapView({
     try {
       mapboxgl.accessToken = settings.mapboxKey;
       
-      const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/navigation-night-v1';
+      const style = getActiveMapStyle();
       
       const map = new mapboxgl.Map({
         container: mapContainerRef.current,
@@ -137,14 +152,14 @@ export default function MapView({
       console.error('Failed to instantiate Mapbox GL JS Map:', err);
       setMapboxError(true);
     }
-  }, [settings.mapboxKey, settings.theme]);
+  }, [settings.mapboxKey]); // Initialize only when Mapbox token changes
 
-  // Handle dynamic map style switching on theme changes (avoids destroying/recreating map instance)
+  // Handle dynamic map style switching on theme / timeOfDay changes
   useEffect(() => {
     if (!mapLoaded || !mapRef.current) return;
-    const style = settings.theme === 'light' ? 'mapbox://styles/mapbox/light-v11' : 'mapbox://styles/mapbox/navigation-night-v1';
+    const style = getActiveMapStyle();
     mapRef.current.setStyle(style);
-  }, [settings.theme, mapLoaded]);
+  }, [settings.theme, timeOfDay, mapLoaded]);
 
   // Draw routes, markers, and POIs on the Mapbox Map
   useEffect(() => {
