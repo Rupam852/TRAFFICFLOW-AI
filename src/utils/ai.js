@@ -390,14 +390,43 @@ Return ONLY the raw JSON. Do not include markdown code block formatting (like \`
       return { possible: true, reason: '' };
     }
 
-    // Robust extraction: isolate everything between first '{' and last '}' to bypass markdown headers or codeblock wraps
-    const jsonStart = jsonText.indexOf('{');
-    const jsonEnd = jsonText.lastIndexOf('}');
-    if (jsonStart !== -1 && jsonEnd !== -1) {
-      jsonText = jsonText.substring(jsonStart, jsonEnd + 1);
+    let result;
+    try {
+      // Robust extraction: isolate everything between first '{' and last '}' to bypass markdown headers or conversational wraps
+      let jsonSegment = jsonText;
+      const jsonStart = jsonText.indexOf('{');
+      const jsonEnd = jsonText.lastIndexOf('}');
+      if (jsonStart !== -1 && jsonEnd !== -1) {
+        jsonSegment = jsonText.substring(jsonStart, jsonEnd + 1);
+      }
+      result = JSON.parse(jsonSegment);
+    } catch (parseErr) {
+      console.warn("AI response is not valid JSON. Falling back to heuristic text-parsing:", parseErr);
+      const lowercaseText = jsonText.toLowerCase();
+      // Heuristic checks for impossibility
+      const isImpossible = lowercaseText.includes('impossible') || 
+                           lowercaseText.includes('no,') || 
+                           lowercaseText.includes('not possible') || 
+                           lowercaseText.includes('separated by') ||
+                           lowercaseText.includes('"possible": false') ||
+                           lowercaseText.includes('cannot travel');
+      
+      // Clean up explanation or take the first sentence
+      let extractedReason = 'AI Routing Guard: Route is impossible.';
+      const sentenceParts = jsonText.split(/[.!?\n]/);
+      for (const part of sentenceParts) {
+        const trimmed = part.trim();
+        if (trimmed && !trimmed.toLowerCase().includes('here is') && !trimmed.toLowerCase().includes('json') && !trimmed.toLowerCase().includes('response')) {
+          extractedReason = trimmed;
+          break;
+        }
+      }
+      return {
+        possible: !isImpossible,
+        reason: extractedReason
+      };
     }
-    
-    const result = JSON.parse(jsonText);
+
     return {
       possible: result.possible === true || result.possible === 'true',
       reason: result.reason || 'AI Routing Guard: Route is impossible.'
