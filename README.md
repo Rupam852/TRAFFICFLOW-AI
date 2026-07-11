@@ -13,14 +13,8 @@ TrafficFlow AI is a professional-grade, state-of-the-art navigation web applicat
 
 ---
 
-## 📸 Screenshots
-
-| Landing Page | Map Dashboard |
-|---|---|
-| ![Landing Page](public/screenshots/landing_page.png) | ![Map Dashboard](public/screenshots/dashboard.png) |
 
 
----
 
 ## 🚀 Key Features
 
