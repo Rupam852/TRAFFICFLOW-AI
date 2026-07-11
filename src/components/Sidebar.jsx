@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
-import { MapPin, Navigation, History, Map, MessageSquareText, Trash2, LogOut } from 'lucide-react';
+import { MapPin, Navigation, History, Map, MessageSquareText, Trash2, LogOut, Zap, Clock, Route, TrendingUp } from 'lucide-react';
 import AiPanel from './AiPanel';
 import { incrementApiUsage } from '../utils/usage';
+
 const Sidebar = forwardRef(function Sidebar({
   settings,
   isSidebarOpen,
@@ -32,7 +33,6 @@ const Sidebar = forwardRef(function Sidebar({
   const [startInput, setStartInput] = useState(startLocation?.name || '');
   const [destInput, setDestInput] = useState(destination?.name || '');
 
-
   const [startSuggestions, setStartSuggestions] = useState([]);
   const [destSuggestions, setDestSuggestions] = useState([]);
   const [focusedField, setFocusedField] = useState(null);
@@ -53,7 +53,6 @@ const Sidebar = forwardRef(function Sidebar({
   const startInputRef = useRef(null);
   const destInputRef = useRef(null);
 
-  // Detect mobile viewport
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 640);
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 640);
@@ -61,20 +60,14 @@ const Sidebar = forwardRef(function Sidebar({
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Sync inputs with props
   useEffect(() => {
-    setTimeout(() => {
-      setStartInput(startLocation?.name || '');
-    }, 0);
+    setTimeout(() => { setStartInput(startLocation?.name || ''); }, 0);
   }, [startLocation]);
 
   useEffect(() => {
-    setTimeout(() => {
-      setDestInput(destination?.name || '');
-    }, 0);
+    setTimeout(() => { setDestInput(destination?.name || ''); }, 0);
   }, [destination]);
 
-  // Query Autocomplete Suggestions from Mapbox, TomTom, or free OSM Photon
   const queryAutocomplete = useCallback(async (query, field) => {
     if (!query || query.trim().length < 2) {
       if (field === 'start') setStartSuggestions([]);
@@ -83,9 +76,8 @@ const Sidebar = forwardRef(function Sidebar({
     }
 
     const trimmed = query.trim();
-    const biasCoords = startLocation?.coordinates || [77.2090, 28.6139]; // Default Delhi CP coords
+    const biasCoords = startLocation?.coordinates || [77.2090, 28.6139];
 
-    // 0. Try Google Places Autocomplete if loaded
     if (window.google && window.google.maps && window.google.maps.places) {
       try {
         const autocompleteService = new window.google.maps.places.AutocompleteService();
@@ -99,297 +91,165 @@ const Sidebar = forwardRef(function Sidebar({
               if (status === window.google.maps.places.PlacesServiceStatus.OK && predictions) {
                 resolve(predictions);
               } else {
-                reject(new Error('Google Places Autocomplete failed with status: ' + status));
+                reject(new Error('No predictions'));
               }
             }
           );
         });
 
-        if (predictions && predictions.length > 0) {
-          incrementApiUsage('googleMaps');
-          const list = predictions.map(p => ({
-            name: p.description,
-            placeId: p.place_id,
-            isGoogle: true
-          }));
-          if (field === 'start') setStartSuggestions(list);
-          if (field === 'dest') setDestSuggestions(list);
-          return;
-        }
-      } catch (e) {
-        console.warn('Google Places Autocomplete error, falling back:', e);
+        const results = predictions.slice(0, 5).map(p => ({
+          name: p.description,
+          placeId: p.place_id
+        }));
+
+        if (field === 'start') setStartSuggestions(results);
+        if (field === 'dest') setDestSuggestions(results);
+        return;
+      } catch (err) {
+        // fall through
       }
     }
 
-    // 1. Try Mapbox if key is available
-    if (settings.mapboxKey) {
-      try {
-        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${settings.mapboxKey}&limit=5&proximity=${biasCoords[0]},${biasCoords[1]}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.features && data.features.length > 0) {
-          incrementApiUsage('mapbox');
-          const list = data.features.map(f => ({
-            name: f.place_name,
-            coordinates: f.geometry.coordinates
-          }));
-          if (field === 'start') setStartSuggestions(list);
-          if (field === 'dest') setDestSuggestions(list);
-          return;
-        }
-      } catch (e) {
-        console.warn('Mapbox Autocomplete error, falling back:', e);
-      }
-    }
-
-    // 2. Try TomTom if key is available
-    if (settings.tomtomKey) {
-      try {
-        const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(trimmed)}.json?key=${settings.tomtomKey}&limit=5&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        if (data.results && data.results.length > 0) {
-          incrementApiUsage('tomtom');
-          const list = data.results.map(r => ({
-            name: r.address.freeformAddress,
-            coordinates: [r.position.lon, r.position.lat]
-          }));
-          if (field === 'start') setStartSuggestions(list);
-          if (field === 'dest') setDestSuggestions(list);
-          return;
-        }
-      } catch (e) {
-        console.warn('TomTom Autocomplete error, falling back:', e);
-      }
-    }
-
-    // 3. Fallback: Komoot Photon API (free, OSM-based)
     try {
-      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed)}&limit=5&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
+      const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed)}&lat=${biasCoords[1]}&lon=${biasCoords[0]}&limit=5`;
       const res = await fetch(url);
       const data = await res.json();
-      if (data.features && data.features.length > 0) {
-        const list = data.features.map(f => {
-          const props = f.properties;
-          const parts = [];
-          if (props.name) parts.push(props.name);
-          if (props.city && props.city !== props.name) parts.push(props.city);
-          if (props.state && props.state !== props.name && props.state !== props.city) parts.push(props.state);
-          if (props.country) parts.push(props.country);
-          return {
-            name: parts.join(', '),
-            coordinates: f.geometry.coordinates
-          };
-        });
-        if (field === 'start') setStartSuggestions(list);
-        if (field === 'dest') setDestSuggestions(list);
-      }
-    } catch (e) {
-      console.error('All Autocomplete options failed:', e);
+      const results = (data.features || []).map(f => {
+        const props = f.properties;
+        const parts = [];
+        if (props.name) parts.push(props.name);
+        if (props.city && props.city !== props.name) parts.push(props.city);
+        if (props.state && props.state !== props.name && props.state !== props.city) parts.push(props.state);
+        if (props.country) parts.push(props.country);
+        return { name: parts.join(', '), coordinates: f.geometry.coordinates };
+      });
+      if (field === 'start') setStartSuggestions(results);
+      if (field === 'dest') setDestSuggestions(results);
+    } catch (err) {
+      // silent fail
     }
-  }, [startLocation, settings.mapboxKey, settings.tomtomKey]);
+  }, [startLocation]);
 
-  // Debounced query trigger on input change
   useEffect(() => {
-    if (focusedField !== 'start') return;
-    const timer = setTimeout(() => {
-      queryAutocomplete(startInput, 'start');
-    }, 300);
-    return () => clearTimeout(timer);
+    if (focusedField === 'start' && startInput.trim().length >= 2) {
+      const t = setTimeout(() => queryAutocomplete(startInput, 'start'), 300);
+      return () => clearTimeout(t);
+    } else if (focusedField === 'start') {
+      setStartSuggestions([]);
+    }
   }, [startInput, focusedField, queryAutocomplete]);
 
   useEffect(() => {
-    if (focusedField !== 'dest') return;
-    const timer = setTimeout(() => {
-      queryAutocomplete(destInput, 'dest');
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [destInput, focusedField, queryAutocomplete]);
-
-
-
-  const handleSelectSuggestion = async (suggestion, field) => {
-    let coords = suggestion.coordinates;
-
-    if (suggestion.isGoogle && suggestion.placeId) {
-      try {
-        const geocoder = new window.google.maps.Geocoder();
-        const results = await new Promise((resolve, reject) => {
-          geocoder.geocode({ placeId: suggestion.placeId }, (results, status) => {
-            if (status === window.google.maps.GeocoderStatus.OK && results && results[0]) {
-              resolve(results);
-            } else {
-              reject(new Error('Google Geocoder failed with status: ' + status));
-            }
-          });
-        });
-        if (results && results[0]) {
-          const loc = results[0].geometry.location;
-          coords = [loc.lng(), loc.lat()];
-        }
-      } catch (err) {
-        console.error('Failed to geocode Google Place ID:', err);
-        alert('Failed to resolve coordinates using Google Maps Geocoder. Please try again.');
-        return;
-      }
-    }
-
-    if (field === 'start') {
-      setStartInput(suggestion.name);
-      setStartLocation({
-        name: suggestion.name,
-        coordinates: coords
-      });
-      setStartSuggestions([]);
-    } else {
-      setDestInput(suggestion.name);
-      setDestination({
-        name: suggestion.name,
-        coordinates: coords
-      });
+    if (focusedField === 'dest' && destInput.trim().length >= 2) {
+      const t = setTimeout(() => queryAutocomplete(destInput, 'dest'), 300);
+      return () => clearTimeout(t);
+    } else if (focusedField === 'dest') {
       setDestSuggestions([]);
     }
-    setFocusedField(null);
-  };
+  }, [destInput, focusedField, queryAutocomplete]);
 
+  const handleSelectSuggestion = useCallback((suggestion, field) => {
+    if (field === 'start') {
+      setStartInput(suggestion.name);
+      setStartSuggestions([]);
+      if (suggestion.coordinates) {
+        setStartLocation({ name: suggestion.name, coordinates: suggestion.coordinates });
+      } else if (suggestion.placeId && window.google) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ placeId: suggestion.placeId }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            const loc = results[0].geometry.location;
+            setStartLocation({ name: suggestion.name, coordinates: [loc.lng(), loc.lat()] });
+          }
+        });
+      }
+    } else {
+      setDestInput(suggestion.name);
+      setDestSuggestions([]);
+      if (suggestion.coordinates) {
+        setDestination({ name: suggestion.name, coordinates: suggestion.coordinates });
+      } else if (suggestion.placeId && window.google) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ placeId: suggestion.placeId }, (results, status) => {
+          if (status === 'OK' && results[0]) {
+            const loc = results[0].geometry.location;
+            setDestination({ name: suggestion.name, coordinates: [loc.lng(), loc.lat()] });
+          }
+        });
+      }
+    }
+  }, [setStartLocation, setDestination]);
 
   const handleSearchSubmit = async (e) => {
     e.preventDefault();
-    if (!destInput) return;
+    incrementApiUsage('routing');
 
-
-
-    // Helper geocode function
     const geocodeQuery = async (query) => {
-      const trimmed = query.trim();
-      const biasCoords = startLocation?.coordinates || [77.2090, 28.6139];
-
-      // 0. Try Google Geocoder if loaded
       if (window.google && window.google.maps) {
         try {
           const geocoder = new window.google.maps.Geocoder();
-          const results = await new Promise((resolve, reject) => {
-            geocoder.geocode(
-              {
-                address: trimmed,
-                bounds: new window.google.maps.LatLngBounds(
-                  new window.google.maps.LatLng(biasCoords[1] - 0.5, biasCoords[0] - 0.5),
-                  new window.google.maps.LatLng(biasCoords[1] + 0.5, biasCoords[0] + 0.5)
-                )
-              },
-              (results, status) => {
-                if (status === window.google.maps.GeocoderStatus.OK && results) {
-                  resolve(results);
-                } else {
-                  reject(new Error('Google Geocode failed with status: ' + status));
-                }
-              }
-            );
+          const result = await new Promise((resolve, reject) => {
+            geocoder.geocode({ address: query }, (results, status) => {
+              if (status === 'OK' && results[0]) resolve(results[0]);
+              else reject(new Error('Geocode failed'));
+            });
           });
-
-          if (results && results[0]) {
-            incrementApiUsage('googleMaps');
-            const loc = results[0].geometry.location;
-            return {
-              name: results[0].formatted_address,
-              coordinates: [loc.lng(), loc.lat()]
-            };
-          }
-        } catch (err) {
-          console.warn('Geocoding with Google Maps failed, falling back:', err);
-        }
+          const loc = result.geometry.location;
+          return { name: result.formatted_address, coordinates: [loc.lng(), loc.lat()] };
+        } catch (err) { /* fall through */ }
       }
 
-      // 1. Try Mapbox Geocoding
-      if (settings.mapboxKey) {
-        try {
-          const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(trimmed)}.json?access_token=${settings.mapboxKey}&limit=1&proximity=${biasCoords[0]},${biasCoords[1]}`;
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data.features && data.features.length > 0) {
-            incrementApiUsage('mapbox');
-            return {
-              name: data.features[0].place_name,
-              coordinates: data.features[0].geometry.coordinates
-            };
-          }
-        } catch (err) {
-          console.warn('Geocoding with Mapbox failed:', err);
-        }
-      }
-
-      // 2. Try TomTom Geocoding
-      if (settings.tomtomKey) {
-        try {
-          const url = `https://api.tomtom.com/search/2/geocode/${encodeURIComponent(trimmed)}.json?key=${settings.tomtomKey}&limit=1&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
-          const res = await fetch(url);
-          const data = await res.json();
-          if (data.results && data.results.length > 0) {
-            incrementApiUsage('tomtom');
-            return {
-              name: data.results[0].address.freeformAddress,
-              coordinates: [data.results[0].position.lon, data.results[0].position.lat]
-            };
-          }
-        } catch (err) {
-          console.warn('Geocoding with TomTom failed:', err);
-        }
-      }
-
-      // 3. Fallback: OSM Photon
       try {
-        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(trimmed)}&limit=1&lat=${biasCoords[1]}&lon=${biasCoords[0]}`;
+        const biasCoords = startLocation?.coordinates || [77.2090, 28.6139];
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${biasCoords[1]}&lon=${biasCoords[0]}&limit=1`;
         const res = await fetch(url);
         const data = await res.json();
-        if (data.features && data.features.length > 0) {
-          const f = data.features[0];
+        const f = data.features?.[0];
+        if (f) {
           const props = f.properties;
           const parts = [];
           if (props.name) parts.push(props.name);
           if (props.city && props.city !== props.name) parts.push(props.city);
           if (props.state && props.state !== props.name && props.state !== props.city) parts.push(props.state);
           if (props.country) parts.push(props.country);
-          return {
-            name: parts.join(', '),
-            coordinates: f.geometry.coordinates
-          };
+          return { name: parts.join(', '), coordinates: f.geometry.coordinates };
         }
       } catch (err) {
         console.error('All geocoding options failed:', err);
       }
-
       return null;
     };
 
-    // If start input has been changed and doesn't match startLocation, geocode it
     if (startInput && (!startLocation || startInput.toLowerCase() !== startLocation.name.toLowerCase())) {
       const startResult = await geocodeQuery(startInput);
-      if (startResult) {
-        setStartLocation(startResult);
-      }
+      if (startResult) setStartLocation(startResult);
     }
 
-    // If dest input has been changed and doesn't match destination, geocode it
     if (destInput && (!destination || destInput.toLowerCase() !== destination.name.toLowerCase())) {
       const destResult = await geocodeQuery(destInput);
-      if (destResult) {
-        setDestination(destResult);
-      }
+      if (destResult) setDestination(destResult);
     } else if (destination) {
-      // If destination is already set from selection, update it to trigger route updates in App.jsx
       setDestination({ ...destination });
     }
 
     if (onCollapse) onCollapse();
   };
 
+  const getTrafficConfig = (status) => {
+    const configs = {
+      smooth: { color: '#10b981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.25)', label: 'SMOOTH', glow: 'rgba(16,185,129,0.3)' },
+      moderate: { color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.25)', label: 'MODERATE', glow: 'rgba(245,158,11,0.3)' },
+      heavy: { color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.25)', label: 'HEAVY', glow: 'rgba(239,68,68,0.3)' },
+      blocked: { color: '#7f1d1d', bg: 'rgba(127,29,29,0.15)', border: 'rgba(127,29,29,0.3)', label: 'BLOCKED', glow: 'rgba(127,29,29,0.4)' },
+    };
+    return configs[status] || configs.smooth;
+  };
 
-
-
+  const userDisplayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Guest';
+  const userInitial = userDisplayName[0]?.toUpperCase() || 'U';
 
   return (
     <>
-      {/* Mobile backdrop — tapping it closes the sidebar */}
       {isMobile && isSidebarOpen && (
         <div
           className="mobile-sidebar-backdrop"
@@ -406,396 +266,438 @@ const Sidebar = forwardRef(function Sidebar({
         ].join(' ')}
         style={{
           ...styles.sidebar,
-          // Desktop: use margin-left slide; Mobile: handled by CSS transform
           marginLeft: !isMobile ? (isSidebarOpen ? '0px' : '-420px') : undefined,
           transition: isMobile
             ? 'transform 0.32s cubic-bezier(0.4,0,0.2,1)'
             : 'margin-left 0.3s cubic-bezier(0.4,0,0.2,1)',
         }}
       >
-      {/* Brand Header */}
-      <div style={styles.header}>
-        <div style={styles.logoGroup}>
-          <Navigation size={22} style={styles.logoIcon} />
-          <h2 style={styles.logoText}>TrafficFlow <span style={styles.logoHighlight}>AI</span></h2>
+        {/* Premium Header */}
+        <div style={styles.header}>
+          <div style={styles.logoGroup}>
+            <div style={styles.logoIconWrap}>
+              <Navigation size={18} style={{ color: '#fff', transform: 'rotate(45deg)' }} />
+            </div>
+            <div>
+              <h2 style={styles.logoText}>TrafficFlow <span style={styles.logoHighlight}>AI</span></h2>
+              <div style={styles.logoSubtext}>Smart Navigation Platform</div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <button onClick={onOpenSettings} style={styles.iconBtn} title="Settings">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+            </button>
+            <button
+              className="mobile-only"
+              onClick={onCollapse}
+              style={styles.mobileCloseBtn}
+              title="Close Menu"
+            >
+              ✕
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <button onClick={onOpenSettings} style={styles.settingsBtn} title="Settings">
-            ⚙️
-          </button>
-          {/* Close button — only shown on mobile */}
-          <button
-            className="mobile-only"
-            onClick={onCollapse}
-            style={styles.mobileCloseBtn}
-            title="Close Menu"
-          >
-            ✕
-          </button>
-        </div>
-      </div>
 
-      {/* User Session Profile */}
-      <div style={styles.userSection}>
-        <div style={{
-          ...styles.avatar,
-          backgroundImage: user?.user_metadata?.avatar_url ? `url(${user.user_metadata.avatar_url})` : 'none',
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          color: user?.user_metadata?.avatar_url ? 'transparent' : undefined,
-          border: user?.user_metadata?.avatar_url ? '2px solid var(--primary)' : '1px solid rgba(255, 255, 255, 0.1)',
-          boxShadow: '0 0 8px var(--primary-glow)',
-        }}>
-          {!user?.user_metadata?.avatar_url && (user?.email ? user.email[0].toUpperCase() : 'U')}
-        </div>
-        <div style={styles.userInfo}>
-          <span style={styles.userEmail}>
-            {user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email || 'Guest Session'}
-          </span>
-          <span style={styles.userRole}>
-            {user?.user_metadata?.full_name || user?.user_metadata?.name ? user.email : 'Premium Account'}
-          </span>
-        </div>
-        <button onClick={onLogout} className="logout-btn" title="Sign Out">
-          <LogOut size={16} />
-        </button>
-      </div>
-
-      {/* Sidebar Tabs */}
-      <div style={styles.tabContainer}>
-        <button
-          style={{
-            ...styles.tab,
-            borderBottomColor: activeTab === 'nav' ? 'var(--primary)' : 'transparent',
-            color: activeTab === 'nav' ? 'var(--text-primary)' : 'var(--text-muted)',
-          }}
-          onClick={() => setActiveTab('nav')}
-        >
-          <Map size={16} />
-          <span>Navigation</span>
-        </button>
-        <button
-          style={{
-            ...styles.tab,
-            borderBottomColor: activeTab === 'ai' ? 'var(--primary)' : 'transparent',
-            color: activeTab === 'ai' ? 'var(--text-primary)' : 'var(--text-muted)',
-          }}
-          onClick={() => setActiveTab('ai')}
-        >
-          <MessageSquareText size={16} />
-          <span>AI Cognitive Advisor</span>
-        </button>
-      </div>
-
-      {/* Tab Panel Contents */}
-      <div style={styles.panelContent} className="panel-content-scroll">
-        {activeTab === 'nav' ? (
-          <div style={styles.navPanel}>
-            {routingError && (
-              <div style={{
-                background: isSimulationMode ? 'rgba(239, 68, 68, 0.12)' : 'rgba(245, 158, 11, 0.12)',
-                border: isSimulationMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(245, 158, 11, 0.3)',
-                borderRadius: '8px',
-                padding: '12px 14px',
-                fontSize: '0.78rem',
-                color: isSimulationMode ? '#f87171' : '#fbbf24',
-                marginBottom: '16px',
-                display: 'flex',
-                alignItems: 'flex-start',
-                lineHeight: '1.4'
-              }}>
-                <span style={{ marginRight: '8px', fontSize: '1.1rem', marginTop: '1px', flexShrink: 0 }}>⚠️</span>
-                <div>
-                  <strong>{isSimulationMode ? 'Simulation Mode Active' : 'Routing API Status Warning'}</strong>
-                  <div style={{ marginTop: '4px', fontSize: '0.74rem', opacity: 0.9 }}>
-                    {routingError}
-                  </div>
-                  {(routingError.includes('Console') || routingError.includes('denied')) && (
-                    <div style={{ marginTop: '8px', fontSize: '0.72rem', fontWeight: '700', textDecoration: 'underline' }}>
-                      To fix: Wait 5 minutes for activation, check API key restrictions/billing in Google Console, and refresh the page.
-                    </div>
-                  )}
-                </div>
-              </div>
+        {/* Premium User Profile Section */}
+        <div style={styles.userSection}>
+          <div style={styles.avatarWrap}>
+            {user?.user_metadata?.avatar_url ? (
+              <img
+                src={user.user_metadata.avatar_url}
+                alt="avatar"
+                style={styles.avatarImg}
+              />
+            ) : (
+              <div style={styles.avatarInitial}>{userInitial}</div>
             )}
-            
-            {/* Search Input Form */}
-            <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
-              <div style={styles.searchWrapper}>
-                <div style={styles.searchLine} />
-                
-                <div style={{ position: 'relative', zIndex: 10 }}>
-                  <div style={styles.searchFieldGroup}>
-                    <MapPin size={16} style={{ color: 'var(--primary)', flexShrink: 0 }} />
-                    <input
-                      ref={startInputRef}
-                      type="text"
-                      placeholder="Enter starting location..."
-                      value={startInput}
-                      onChange={(e) => {
-                        setStartInput(e.target.value);
-                        setFocusedField('start');
-                      }}
-                      onFocus={() => setFocusedField('start')}
-                      onBlur={() => setTimeout(() => setFocusedField(null), 200)}
-                      style={styles.searchInput}
-                    />
-                  </div>
-                  {focusedField === 'start' && startSuggestions.length > 0 && (
-                    <div className="suggestions-dropdown">
-                      {startSuggestions.map((s, idx) => (
-                        <div
-                          key={idx}
-                          onMouseDown={() => handleSelectSuggestion(s, 'start')}
-                          className="suggestion-item"
-                        >
-                          <MapPin size={12} className="suggestion-icon" style={{ color: 'var(--primary)' }} />
-                          <span className="suggestion-text">{s.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            <div style={styles.onlineDot} />
+          </div>
+          <div style={styles.userInfo}>
+            <span style={styles.userName}>{userDisplayName}</span>
+            <span style={styles.userEmail}>
+              {user?.user_metadata?.full_name || user?.user_metadata?.name ? user.email : 'Premium Account'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div style={styles.premiumBadge}>
+              <Zap size={10} style={{ color: '#f59e0b' }} />
+              <span>PRO</span>
+            </div>
+            <button onClick={onLogout} className="logout-btn" title="Sign Out">
+              <LogOut size={15} />
+            </button>
+          </div>
+        </div>
 
-                <div style={{ position: 'relative', zIndex: 9 }}>
-                  <div style={styles.searchFieldGroup}>
-                    <Navigation size={16} style={{ color: 'var(--accent)', flexShrink: 0, transform: 'rotate(45deg)' }} />
-                    <input
-                      ref={destInputRef}
-                      type="text"
-                      placeholder="Where to?"
-                      value={destInput}
-                      onChange={(e) => {
-                        setDestInput(e.target.value);
-                        setFocusedField('dest');
-                      }}
-                      onFocus={() => setFocusedField('dest')}
-                      onBlur={() => setTimeout(() => setFocusedField(null), 200)}
-                      style={styles.searchInput}
-                      required
-                    />
+        {/* Premium Tabs */}
+        <div style={styles.tabContainer}>
+          <button
+            style={{
+              ...styles.tab,
+              color: activeTab === 'nav' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+            onClick={() => setActiveTab('nav')}
+          >
+            <div style={{
+              ...styles.tabInner,
+              background: activeTab === 'nav' ? 'rgba(99,102,241,0.12)' : 'transparent',
+              border: activeTab === 'nav' ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
+            }}>
+              <Route size={14} style={{ color: activeTab === 'nav' ? 'var(--primary)' : 'inherit' }} />
+              <span>Navigation</span>
+            </div>
+          </button>
+          <button
+            style={{
+              ...styles.tab,
+              color: activeTab === 'ai' ? 'var(--text-primary)' : 'var(--text-muted)',
+            }}
+            onClick={() => setActiveTab('ai')}
+          >
+            <div style={{
+              ...styles.tabInner,
+              background: activeTab === 'ai' ? 'rgba(139,92,246,0.12)' : 'transparent',
+              border: activeTab === 'ai' ? '1px solid rgba(139,92,246,0.25)' : '1px solid transparent',
+            }}>
+              <MessageSquareText size={14} style={{ color: activeTab === 'ai' ? '#a855f7' : 'inherit' }} />
+              <span>AI Advisor</span>
+            </div>
+          </button>
+        </div>
+
+        {/* Tab Panel Contents */}
+        <div style={styles.panelContent} className="panel-content-scroll">
+          {activeTab === 'nav' ? (
+            <div style={styles.navPanel}>
+
+              {/* Routing Error / Simulation Banner */}
+              {routingError && (
+                <div style={{
+                  background: isSimulationMode ? 'rgba(239,68,68,0.08)' : 'rgba(245,158,11,0.08)',
+                  border: isSimulationMode ? '1px solid rgba(239,68,68,0.25)' : '1px solid rgba(245,158,11,0.25)',
+                  borderRadius: '12px',
+                  padding: '12px 14px',
+                  fontSize: '0.78rem',
+                  color: isSimulationMode ? '#f87171' : '#fbbf24',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: '10px',
+                  lineHeight: '1.4',
+                  backdropFilter: 'blur(8px)',
+                }}>
+                  <span style={{ fontSize: '1.1rem', flexShrink: 0, marginTop: '1px' }}>⚠️</span>
+                  <div>
+                    <strong>{isSimulationMode ? 'Simulation Mode Active' : 'Routing API Status Warning'}</strong>
+                    <div style={{ marginTop: '4px', fontSize: '0.73rem', opacity: 0.85 }}>{routingError}</div>
+                    {(routingError.includes('Console') || routingError.includes('denied')) && (
+                      <div style={{ marginTop: '8px', fontSize: '0.71rem', fontWeight: '700', textDecoration: 'underline' }}>
+                        To fix: Wait 5 minutes for activation, check API key restrictions/billing in Google Console, and refresh the page.
+                      </div>
+                    )}
                   </div>
-                  {focusedField === 'dest' && destSuggestions.length > 0 && (
-                    <div className="suggestions-dropdown">
-                      {destSuggestions.map((s, idx) => (
-                        <div
-                          key={idx}
-                          onMouseDown={() => handleSelectSuggestion(s, 'dest')}
-                          className="suggestion-item"
-                        >
-                          <Navigation size={12} className="suggestion-icon" style={{ color: 'var(--accent)', transform: 'rotate(45deg)' }} />
-                          <span className="suggestion-text">{s.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
+              )}
+
+              {/* Premium Search Form */}
+              <div style={styles.searchCard}>
+                <div style={styles.searchCardHeader}>
+                  <TrendingUp size={14} style={{ color: 'var(--primary)' }} />
+                  <span style={styles.searchCardTitle}>Route Planner</span>
+                </div>
+                <form onSubmit={handleSearchSubmit} style={styles.searchForm}>
+                  <div style={styles.searchWrapper}>
+                    <div style={styles.searchConnector}>
+                      <div style={styles.connectorDotTop} />
+                      <div style={styles.connectorLine} />
+                      <div style={styles.connectorDotBottom} />
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1 }}>
+                      {/* Start Field */}
+                      <div style={{ position: 'relative', zIndex: 10 }}>
+                        <div style={{
+                          ...styles.searchFieldGroup,
+                          borderColor: focusedField === 'start' ? 'var(--primary)' : 'var(--border-color)',
+                          boxShadow: focusedField === 'start' ? '0 0 0 3px var(--primary-glow)' : 'none',
+                        }}>
+                          <MapPin size={15} style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                          <input
+                            ref={startInputRef}
+                            type="text"
+                            placeholder="Starting point..."
+                            value={startInput}
+                            onChange={(e) => { setStartInput(e.target.value); setFocusedField('start'); }}
+                            onFocus={() => setFocusedField('start')}
+                            onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                            style={styles.searchInput}
+                          />
+                          {startInput && (
+                            <button
+                              type="button"
+                              onClick={() => { setStartInput(''); setStartSuggestions([]); }}
+                              style={styles.clearBtn}
+                            >×</button>
+                          )}
+                        </div>
+                        {focusedField === 'start' && startSuggestions.length > 0 && (
+                          <div className="suggestions-dropdown">
+                            {startSuggestions.map((s, idx) => (
+                              <div key={idx} onMouseDown={() => handleSelectSuggestion(s, 'start')} className="suggestion-item">
+                                <MapPin size={12} className="suggestion-icon" style={{ color: 'var(--primary)', flexShrink: 0 }} />
+                                <span className="suggestion-text">{s.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Destination Field */}
+                      <div style={{ position: 'relative', zIndex: 9 }}>
+                        <div style={{
+                          ...styles.searchFieldGroup,
+                          borderColor: focusedField === 'dest' ? '#a855f7' : 'var(--border-color)',
+                          boxShadow: focusedField === 'dest' ? '0 0 0 3px rgba(168,85,247,0.2)' : 'none',
+                        }}>
+                          <Navigation size={15} style={{ color: '#a855f7', flexShrink: 0, transform: 'rotate(45deg)' }} />
+                          <input
+                            ref={destInputRef}
+                            type="text"
+                            placeholder="Where to?"
+                            value={destInput}
+                            onChange={(e) => { setDestInput(e.target.value); setFocusedField('dest'); }}
+                            onFocus={() => setFocusedField('dest')}
+                            onBlur={() => setTimeout(() => setFocusedField(null), 200)}
+                            style={styles.searchInput}
+                            required
+                          />
+                          {destInput && (
+                            <button
+                              type="button"
+                              onClick={() => { setDestInput(''); setDestSuggestions([]); }}
+                              style={styles.clearBtn}
+                            >×</button>
+                          )}
+                        </div>
+                        {focusedField === 'dest' && destSuggestions.length > 0 && (
+                          <div className="suggestions-dropdown">
+                            {destSuggestions.map((s, idx) => (
+                              <div key={idx} onMouseDown={() => handleSelectSuggestion(s, 'dest')} className="suggestion-item">
+                                <Navigation size={12} className="suggestion-icon" style={{ color: '#a855f7', transform: 'rotate(45deg)', flexShrink: 0 }} />
+                                <span className="suggestion-text">{s.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="submit" className="glow-btn" style={styles.findRouteBtn}>
+                    <Zap size={15} />
+                    Find Fastest Route
+                  </button>
+                </form>
               </div>
 
-              <button type="submit" className="glow-btn" style={styles.findRouteBtn}>
-                Find Fastest Route
-              </button>
-            </form>
-
-
-
-            {/* Search History */}
-            <div style={styles.section}>
-              <span style={styles.sectionTitle}>Recent Searches</span>
-              <div style={styles.historyList}>
-                {searchHistory.length === 0 ? (
-                  <span style={styles.emptyText}>No recent searches.</span>
-                ) : (
-                  searchHistory.map((item, index) => (
-                    <div
-                      key={index}
-                      onClick={() => {
-                        setDestInput(item.name);
-                        onSelectHistory(item);
-                      }}
-                      style={styles.historyItem}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, overflow: 'hidden' }}>
-                        <History size={14} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-                        <span style={{ ...styles.historyName, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {/* Search History */}
+              {searchHistory.length > 0 && (
+                <div style={styles.section}>
+                  <div style={styles.sectionHeader}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Clock size={13} style={{ color: 'var(--text-muted)' }} />
+                      <span style={styles.sectionTitle}>Recent</span>
+                    </div>
+                  </div>
+                  <div style={styles.historyList}>
+                    {searchHistory.map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() => { setDestInput(item.name); onSelectHistory(item); }}
+                        style={styles.historyItem}
+                      >
+                        <div style={styles.historyIconWrap}>
+                          <History size={12} style={{ color: 'var(--text-muted)' }} />
+                        </div>
+                        <span style={{ ...styles.historyName, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                           {item.name}
                         </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onRemoveHistory(index); }}
+                          className="delete-bookmark-btn"
+                          title="Delete"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onRemoveHistory(index);
-                        }}
-                        className="delete-bookmark-btn"
-                        title="Delete Search History"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-
-
-            {/* Alternative Routes display */}
-            {((routeOptions && routeOptions.length > 0) || isRoutesLoading) && (
-              <div style={styles.section}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <span style={styles.sectionTitle}>
-                    {isRoutesLoading ? 'Calculating Routes...' : 'Calculated Routes'}
-                  </span>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                    <select
-                      value={travelMode}
-                      onChange={(e) => onTravelModeChange(e.target.value)}
-                      style={styles.modeSelect}
-                    >
-                      <option value="car">🚗 Car</option>
-                      <option value="motorbike">🏍️ Motorbike</option>
-                      <option value="bicycle">🚲 Bicycle</option>
-                      <option value="walk">🚶 Walk</option>
-                    </select>
-                    <button onClick={onShareEta} className="glow-btn" style={styles.shareBtn}>
-                      Share ETA
-                    </button>
+                    ))}
                   </div>
                 </div>
-                <div style={{ ...styles.routesList, position: 'relative' }}>
-                  {isRoutesLoading ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {[1, 2, 3].map((n) => (
-                        <div key={n} className="skeleton-card skeleton-pulse" style={{ marginBottom: '4px' }}>
-                          <div className="skeleton-header">
-                            <div className="skeleton-title" />
-                            <div className="skeleton-badge" />
-                          </div>
-                          <div className="skeleton-stats" style={{ marginTop: '8px' }} />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <>
-                      {routeOptions.map((route, idx) => {
-                        const isSelected = idx === selectedRouteIndex;
-                        
-                        let statusColor = 'var(--traffic-smooth)';
-                        if (route.trafficStatus === 'moderate') statusColor = 'var(--traffic-moderate)';
-                        if (route.trafficStatus === 'heavy') statusColor = 'var(--traffic-heavy)';
-                        if (route.trafficStatus === 'blocked') statusColor = 'var(--traffic-blocked)';
+              )}
 
-                        return (
-                          <div
-                            key={idx}
-                            onClick={() => onRouteSelected(idx)}
-                            style={{
-                              ...styles.routeCard,
-                              borderColor: isSelected ? 'var(--primary)' : 'var(--border-color)',
-                              background: isSelected ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
-                            }}
-                          >
-                            <div style={styles.routeHeader}>
-                              <span style={styles.routeName}>{route.name}</span>
-                              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                                {route.isRecommended && (
-                                  <span style={styles.recommendedBadge}>RECOMMENDED</span>
-                                )}
-                                 {isSelected && (
+              {/* Routes Section */}
+              {((routeOptions && routeOptions.length > 0) || isRoutesLoading) && (
+                <div style={styles.section}>
+                  <div style={styles.sectionHeader}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Route size={13} style={{ color: 'var(--text-muted)' }} />
+                      <span style={styles.sectionTitle}>
+                        {isRoutesLoading ? 'Calculating...' : 'Routes Found'}
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <select
+                        value={travelMode}
+                        onChange={(e) => onTravelModeChange(e.target.value)}
+                        style={styles.modeSelect}
+                      >
+                        <option value="car">🚗 Car</option>
+                        <option value="motorbike">🏍️ Bike</option>
+                        <option value="bicycle">🚲 Cycle</option>
+                        <option value="walk">🚶 Walk</option>
+                      </select>
+                      <button onClick={onShareEta} className="glow-btn" style={styles.shareBtn}>
+                        Share ETA
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ ...styles.routesList, position: 'relative' }}>
+                    {isRoutesLoading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {[1, 2, 3].map((n) => (
+                          <div key={n} className="skeleton-card skeleton-pulse" style={{ marginBottom: '4px' }}>
+                            <div className="skeleton-header">
+                              <div className="skeleton-title" />
+                              <div className="skeleton-badge" />
+                            </div>
+                            <div className="skeleton-stats" style={{ marginTop: '8px' }} />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <>
+                        {routeOptions.map((route, idx) => {
+                          const isSelected = idx === selectedRouteIndex;
+                          const tc = getTrafficConfig(route.trafficStatus);
+
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => onRouteSelected(idx)}
+                              style={{
+                                ...styles.routeCard,
+                                borderColor: isSelected ? 'rgba(99,102,241,0.5)' : 'var(--border-color)',
+                                background: isSelected
+                                  ? 'linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(139,92,246,0.06) 100%)'
+                                  : 'var(--bg-secondary)',
+                                boxShadow: isSelected ? '0 4px 20px rgba(99,102,241,0.15), inset 0 0 0 1px rgba(99,102,241,0.1)' : 'var(--shadow-sm)',
+                              }}
+                            >
+                              {/* Route Card Header */}
+                              <div style={styles.routeHeader}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                  <div style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    backgroundColor: tc.color,
+                                    boxShadow: `0 0 6px ${tc.glow}`,
+                                    flexShrink: 0,
+                                  }} />
+                                  <span style={styles.routeName}>{route.name}</span>
+                                </div>
+                                <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
+                                  {route.isRecommended && (
+                                    <span style={styles.recommendedBadge}>⭐ BEST</span>
+                                  )}
+                                  {isSelected && (
+                                    <span style={styles.liveBadge}>
+                                      <span className="pulse-dot" style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
+                                      LIVE
+                                    </span>
+                                  )}
                                   <span style={{
-                                    fontSize: '0.62rem',
-                                    fontWeight: '800',
-                                    color: '#10b981',
-                                    border: '1px solid rgba(16, 185, 129, 0.3)',
-                                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                    padding: '2px 6px',
-                                    borderRadius: '10px',
-                                    letterSpacing: '0.04em',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '3px'
+                                    ...styles.trafficBadge,
+                                    color: tc.color,
+                                    backgroundColor: tc.bg,
+                                    border: `1px solid ${tc.border}`,
                                   }}>
-                                    <span className="pulse-dot" style={{
-                                      width: '5px',
-                                      height: '5px',
-                                      borderRadius: '50%',
-                                      backgroundColor: '#10b981',
-                                      display: 'inline-block'
-                                    }} />
-                                    LIVE
+                                    {tc.label}
                                   </span>
-                                )}
-                                <span style={{ ...styles.trafficBadge, backgroundColor: statusColor }}>
-                                  {route.trafficStatus.toUpperCase()}
-                                </span>
+                                </div>
                               </div>
-                            </div>
-                            <div style={styles.routeStats}>
-                              <span style={styles.routeStatVal}>{route.duration}</span>
-                              <span style={styles.routeStatSep}>•</span>
-                              <span>{route.distance}</span>
-                            </div>
-                            {route.delayInfo && (
-                              <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
-                            )}
-                            {route.aiReason && (
-                              <div style={{
-                                marginTop: '8px',
-                                fontSize: '0.74rem',
-                                color: 'var(--text-secondary)',
-                                backgroundColor: 'rgba(139, 92, 246, 0.08)',
-                                borderLeft: '3px solid #8b5cf6',
-                                padding: '6px 10px',
-                                borderRadius: '4px',
-                                fontWeight: '500',
-                                lineHeight: '1.4'
-                              }}>
-                                🧠 <strong>AI Analysis:</strong> {route.aiReason}
+
+                              {/* Route Stats */}
+                              <div style={styles.routeStats}>
+                                <div style={styles.routeStatItem}>
+                                  <Clock size={11} style={{ color: 'var(--text-muted)' }} />
+                                  <span style={styles.routeStatVal}>{route.duration}</span>
+                                </div>
+                                <div style={styles.routeStatDivider} />
+                                <div style={styles.routeStatItem}>
+                                  <Route size={11} style={{ color: 'var(--text-muted)' }} />
+                                  <span>{route.distance}</span>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
 
-                      {routeOptions.length === 1 && (
-                        <div style={styles.noAlternativesText}>
-                          ℹ️ No other alternative routes available.
-                        </div>
-                      )}
+                              {/* Traffic Progress Bar */}
+                              <div style={styles.trafficBar}>
+                                <div style={{
+                                  ...styles.trafficBarFill,
+                                  width: route.trafficStatus === 'smooth' ? '30%'
+                                    : route.trafficStatus === 'moderate' ? '60%'
+                                    : route.trafficStatus === 'heavy' ? '85%' : '100%',
+                                  backgroundColor: tc.color,
+                                  boxShadow: `0 0 6px ${tc.glow}`,
+                                }} />
+                              </div>
 
-                      {routeOptions.length === 0 && (
-                        <div style={styles.noAlternativesText}>
-                          ⚠️ No possible routes found for this trip.
-                        </div>
-                      )}
+                              {route.delayInfo && (
+                                <span style={styles.delayInfo}>⚠️ {route.delayInfo}</span>
+                              )}
+                              {route.aiReason && (
+                                <div style={styles.aiReason}>
+                                  🧠 <strong>AI:</strong> {route.aiReason}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
 
+                        {routeOptions.length === 1 && (
+                          <div style={styles.noAlternativesText}>ℹ️ No alternative routes available.</div>
+                        )}
+                        {routeOptions.length === 0 && (
+                          <div style={styles.noAlternativesText}>⚠️ No routes found for this trip.</div>
+                        )}
+                      </>
+                    )}
 
-                    </>
-                  )}
-
-                  {isRouteSwitching && (
-                    <div className="route-switch-overlay">
-                      <div className="route-switch-spinner" />
-                      <span className="route-switch-text">Analyzing path & traffic...</span>
-                    </div>
-                  )}
+                    {isRouteSwitching && (
+                      <div className="route-switch-overlay">
+                        <div className="route-switch-spinner" />
+                        <span className="route-switch-text">Analyzing path & traffic...</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-          </div>
-        ) : (
-          /* AI Analyst panel loaded inside the second tab */
-          <AiPanel
-            settings={settings}
-            startLocation={startLocation}
-            destination={destination}
-            routeOptions={routeOptions}
-            selectedRouteIndex={selectedRouteIndex}
-          />
-        )}
+            </div>
+          ) : (
+            <AiPanel
+              settings={settings}
+              startLocation={startLocation}
+              destination={destination}
+              routeOptions={routeOptions}
+              selectedRouteIndex={selectedRouteIndex}
+            />
+          )}
+        </div>
       </div>
-    </div>
     </>
   );
 });
@@ -816,65 +718,111 @@ const styles = {
     zIndex: 200,
     flexShrink: 0,
   },
+
+  // ── Header ──
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: '20px 24px',
+    padding: '18px 20px',
     borderBottom: '1px solid var(--border-color)',
+    background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(139,92,246,0.04) 100%)',
   },
   logoGroup: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
+    gap: '12px',
   },
-  logoIcon: {
-    color: 'var(--primary)',
-    transform: 'rotate(45deg)',
-    filter: 'drop-shadow(0 0 6px var(--primary-glow))',
+  logoIconWrap: {
+    width: '36px',
+    height: '36px',
+    borderRadius: '10px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+    flexShrink: 0,
   },
   logoText: {
-    fontSize: '1.25rem',
+    fontSize: '1.1rem',
     fontWeight: '800',
     letterSpacing: '-0.02em',
     color: 'var(--text-primary)',
+    lineHeight: 1.1,
   },
   logoHighlight: {
-    color: 'var(--primary)',
+    background: 'linear-gradient(135deg, #6366f1, #a855f7)',
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
   },
-  settingsBtn: {
-    background: 'none',
-    border: 'none',
-    fontSize: '1.2rem',
+  logoSubtext: {
+    fontSize: '0.65rem',
+    color: 'var(--text-muted)',
+    fontWeight: '500',
+    letterSpacing: '0.02em',
+    marginTop: '1px',
+  },
+  iconBtn: {
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border-color)',
+    color: 'var(--text-secondary)',
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
     cursor: 'pointer',
-    padding: '4px',
-    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
     transition: 'var(--transition-smooth)',
-    '&:hover': {
-      backgroundColor: 'var(--bg-tertiary)',
-    },
   },
+
+  // ── User Section ──
   userSection: {
-    padding: '12px 24px',
+    padding: '14px 20px',
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
     borderBottom: '1px solid var(--border-color)',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+    background: 'rgba(255,255,255,0.015)',
   },
-  avatar: {
-    width: '36px',
-    height: '36px',
-    borderRadius: '50%',
-    backgroundColor: 'var(--primary)',
-    color: '#ffffff',
+  avatarWrap: {
+    position: 'relative',
+    flexShrink: 0,
+  },
+  avatarImg: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '12px',
+    border: '2px solid rgba(99,102,241,0.4)',
+    objectFit: 'cover',
+    boxShadow: '0 0 12px rgba(99,102,241,0.3)',
+  },
+  avatarInitial: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+    color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontWeight: '700',
-    fontSize: '0.95rem',
-    boxShadow: '0 0 8px var(--primary-glow)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
+    fontWeight: '800',
+    fontSize: '1rem',
+    boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+    letterSpacing: '-0.02em',
+  },
+  onlineDot: {
+    position: 'absolute',
+    bottom: '-2px',
+    right: '-2px',
+    width: '10px',
+    height: '10px',
+    borderRadius: '50%',
+    backgroundColor: '#10b981',
+    border: '2px solid var(--bg-glass)',
+    boxShadow: '0 0 6px rgba(16,185,129,0.6)',
   },
   userInfo: {
     display: 'flex',
@@ -882,39 +830,66 @@ const styles = {
     flex: 1,
     overflow: 'hidden',
   },
-  userEmail: {
-    fontSize: '0.85rem',
-    fontWeight: '600',
+  userName: {
+    fontSize: '0.88rem',
+    fontWeight: '700',
     color: 'var(--text-primary)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    letterSpacing: '-0.01em',
   },
-  userRole: {
+  userEmail: {
     fontSize: '0.7rem',
     color: 'var(--text-muted)',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  premiumBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '3px',
+    padding: '3px 8px',
+    borderRadius: '20px',
+    background: 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(251,191,36,0.1) 100%)',
+    border: '1px solid rgba(245,158,11,0.3)',
+    fontSize: '0.62rem',
+    fontWeight: '800',
+    color: '#f59e0b',
+    letterSpacing: '0.06em',
+    flexShrink: 0,
   },
 
+  // ── Tabs ──
   tabContainer: {
     display: 'flex',
+    gap: '6px',
+    padding: '10px 14px',
     borderBottom: '1px solid var(--border-color)',
     backgroundColor: 'var(--bg-tertiary)',
   },
   tab: {
     flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '8px',
-    padding: '14px',
     background: 'none',
     border: 'none',
-    borderBottom: '2px solid transparent',
-    fontSize: '0.85rem',
+    fontSize: '0.8rem',
     fontWeight: '600',
     cursor: 'pointer',
     transition: 'var(--transition-smooth)',
+    padding: 0,
   },
+  tabInner: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    padding: '8px 12px',
+    borderRadius: '8px',
+    transition: 'var(--transition-smooth)',
+  },
+
+  // ── Panel & Nav Panel ──
   panelContent: {
     flex: 1,
     overflowY: 'auto',
@@ -922,41 +897,87 @@ const styles = {
     flexDirection: 'column',
   },
   navPanel: {
-    padding: '24px',
+    padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '24px',
+    gap: '16px',
+  },
+
+  // ── Search Card ──
+  searchCard: {
+    borderRadius: '14px',
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-secondary)',
+    padding: '14px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+    boxShadow: 'var(--shadow-sm)',
+  },
+  searchCardHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  searchCardTitle: {
+    fontSize: '0.75rem',
+    fontWeight: '700',
+    color: 'var(--text-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
   },
   searchForm: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
+    gap: '10px',
   },
   searchWrapper: {
-    position: 'relative',
+    display: 'flex',
+    gap: '12px',
+    alignItems: 'stretch',
+  },
+  searchConnector: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
-    padding: '8px 0',
+    alignItems: 'center',
+    paddingTop: '17px',
+    paddingBottom: '17px',
+    gap: 0,
+    flexShrink: 0,
   },
-  searchLine: {
-    position: 'absolute',
-    left: '20px',
-    top: '22px',
-    bottom: '22px',
+  connectorDotTop: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--primary)',
+    boxShadow: '0 0 6px var(--primary-glow)',
+    flexShrink: 0,
+  },
+  connectorLine: {
+    flex: 1,
     width: '2px',
-    borderLeft: '2px dashed var(--border-color)',
-    zIndex: 1,
+    background: 'linear-gradient(to bottom, var(--primary), #a855f7)',
+    minHeight: '20px',
+    borderRadius: '1px',
+    opacity: 0.4,
+  },
+  connectorDotBottom: {
+    width: '8px',
+    height: '8px',
+    borderRadius: '50%',
+    backgroundColor: '#a855f7',
+    boxShadow: '0 0 6px rgba(168,85,247,0.4)',
+    flexShrink: 0,
   },
   searchFieldGroup: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
-    padding: '10px 14px',
-    borderRadius: '8px',
+    gap: '10px',
+    padding: '10px 12px',
+    borderRadius: '10px',
     backgroundColor: 'var(--bg-tertiary)',
     border: '1px solid var(--border-color)',
-    zIndex: 2,
+    transition: 'var(--transition-smooth)',
   },
   searchInput: {
     flex: 1,
@@ -966,49 +987,98 @@ const styles = {
     color: 'var(--text-primary)',
     fontFamily: 'var(--font-sans)',
     fontSize: '0.85rem',
+    minWidth: 0,
+  },
+  clearBtn: {
+    background: 'none',
+    border: 'none',
+    color: 'var(--text-muted)',
+    cursor: 'pointer',
+    fontSize: '1.1rem',
+    lineHeight: 1,
+    padding: '0 2px',
+    flexShrink: 0,
   },
   findRouteBtn: {
     width: '100%',
     padding: '11px',
     justifyContent: 'center',
-    fontSize: '0.9rem',
+    fontSize: '0.88rem',
+    fontWeight: '700',
+    borderRadius: '10px',
+    letterSpacing: '0.02em',
+    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+    boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
   },
+
+  // ── Sections ──
   section: {
     display: 'flex',
     flexDirection: 'column',
+    gap: '8px',
   },
   sectionHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '10px',
   },
   sectionTitle: {
-    fontSize: '0.75rem',
+    fontSize: '0.72rem',
     fontWeight: '700',
     color: 'var(--text-muted)',
     textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '10px',
+    letterSpacing: '0.06em',
   },
 
+  // ── History ──
+  historyList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+  },
+  historyItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+    padding: '8px 10px',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    transition: 'var(--transition-smooth)',
+    border: '1px solid transparent',
+  },
+  historyIconWrap: {
+    width: '26px',
+    height: '26px',
+    borderRadius: '6px',
+    backgroundColor: 'var(--bg-tertiary)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  historyName: {
+    fontSize: '0.8rem',
+    color: 'var(--text-secondary)',
+  },
+
+  // ── Routes ──
   routesList: {
     display: 'flex',
     flexDirection: 'column',
     gap: '8px',
   },
   routeCard: {
-    padding: '12px 16px',
-    borderRadius: '10px',
+    padding: '14px',
+    borderRadius: '12px',
     border: '1px solid',
     cursor: 'pointer',
-    transition: 'var(--transition-smooth)',
+    transition: 'all 0.25s cubic-bezier(0.4,0,0.2,1)',
   },
   routeHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '6px',
+    marginBottom: '10px',
   },
   routeName: {
     fontSize: '0.85rem',
@@ -1016,104 +1086,121 @@ const styles = {
     color: 'var(--text-primary)',
   },
   trafficBadge: {
-    fontSize: '0.65rem',
-    fontWeight: '700',
-    color: '#ffffff',
-    padding: '2px 6px',
-    borderRadius: '4px',
+    fontSize: '0.62rem',
+    fontWeight: '800',
+    padding: '2px 7px',
+    borderRadius: '20px',
+    letterSpacing: '0.05em',
   },
   recommendedBadge: {
     fontSize: '0.6rem',
     fontWeight: '800',
-    color: '#ffffff',
-    background: 'linear-gradient(135deg, #a855f7 0%, #6366f1 100%)',
+    color: '#f59e0b',
+    background: 'rgba(245,158,11,0.12)',
+    border: '1px solid rgba(245,158,11,0.3)',
     padding: '2px 6px',
-    borderRadius: '4px',
-    boxShadow: '0 0 8px rgba(168, 85, 247, 0.4)',
-    letterSpacing: '0.05em',
+    borderRadius: '20px',
+    letterSpacing: '0.04em',
+  },
+  liveBadge: {
+    fontSize: '0.6rem',
+    fontWeight: '800',
+    color: '#10b981',
+    border: '1px solid rgba(16,185,129,0.3)',
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    padding: '2px 6px',
+    borderRadius: '20px',
+    letterSpacing: '0.04em',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: '4px',
   },
   routeStats: {
     display: 'flex',
-    gap: '8px',
+    gap: '10px',
     fontSize: '0.8rem',
     color: 'var(--text-secondary)',
+    alignItems: 'center',
+    marginBottom: '8px',
+  },
+  routeStatItem: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
   },
   routeStatVal: {
-    fontWeight: '600',
+    fontWeight: '700',
     color: 'var(--text-primary)',
   },
-  routeStatSep: {
-    color: 'var(--text-muted)',
+  routeStatDivider: {
+    width: '3px',
+    height: '3px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--text-muted)',
+  },
+  trafficBar: {
+    height: '3px',
+    borderRadius: '99px',
+    backgroundColor: 'var(--border-color)',
+    overflow: 'hidden',
+    marginBottom: '6px',
+  },
+  trafficBarFill: {
+    height: '100%',
+    borderRadius: '99px',
+    transition: 'width 0.6s cubic-bezier(0.4,0,0.2,1)',
   },
   delayInfo: {
     display: 'block',
-    fontSize: '0.75rem',
+    fontSize: '0.73rem',
     color: 'var(--traffic-heavy)',
-    marginTop: '6px',
+    marginTop: '4px',
     fontWeight: '500',
   },
-  shareBtn: {
-    padding: '4px 10px',
-    fontSize: '0.75rem',
+  aiReason: {
+    marginTop: '8px',
+    fontSize: '0.73rem',
+    color: 'var(--text-secondary)',
+    backgroundColor: 'rgba(139,92,246,0.07)',
+    borderLeft: '3px solid rgba(139,92,246,0.5)',
+    padding: '7px 10px',
+    borderRadius: '0 6px 6px 0',
+    fontWeight: '500',
+    lineHeight: '1.45',
   },
 
-  historyList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
-  historyItem: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '8px 12px',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    transition: 'var(--transition-smooth)',
-    '&:hover': {
-      backgroundColor: 'var(--bg-tertiary)',
-    },
-  },
-  historyName: {
-    fontSize: '0.8rem',
-    color: 'var(--text-secondary)',
-  },
-  emptyText: {
-    fontSize: '0.75rem',
-    color: 'var(--text-muted)',
-    fontStyle: 'italic',
-    padding: '4px 0',
-  },
+  // ── Misc ──
   modeSelect: {
-    padding: '4px 8px',
-    borderRadius: '6px',
+    padding: '5px 8px',
+    borderRadius: '8px',
     border: '1px solid var(--border-color)',
     background: 'var(--bg-tertiary)',
     color: 'var(--text-primary)',
-    fontSize: '0.75rem',
+    fontSize: '0.73rem',
     fontWeight: '600',
     outline: 'none',
     cursor: 'pointer',
     transition: 'var(--transition-fast)',
   },
-  startNavBtn: {
-    marginTop: '10px',
-    width: '100%',
-    padding: '10px 0',
+  shareBtn: {
+    padding: '5px 10px',
+    fontSize: '0.73rem',
     borderRadius: '8px',
-    border: 'none',
-    background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-    color: '#fff',
-    fontSize: '0.82rem',
-    fontWeight: '700',
-    cursor: 'pointer',
-    letterSpacing: '0.04em',
-    transition: 'opacity 0.2s',
-    boxShadow: '0 4px 16px rgba(99,102,241,0.35)',
+  },
+  noAlternativesText: {
+    fontSize: '0.72rem',
+    color: 'var(--text-muted)',
+    textAlign: 'center',
+    padding: '14px',
+    border: '1px dashed rgba(255,255,255,0.08)',
+    borderRadius: '10px',
+    backgroundColor: 'rgba(255,255,255,0.02)',
+    marginTop: '4px',
+    lineHeight: '1.4',
   },
   mobileCloseBtn: {
-    background: 'rgba(239,68,68,0.12)',
-    border: '1px solid rgba(239,68,68,0.3)',
+    background: 'rgba(239,68,68,0.1)',
+    border: '1px solid rgba(239,68,68,0.25)',
     color: '#f87171',
     borderRadius: '8px',
     padding: '5px 10px',
@@ -1122,17 +1209,6 @@ const styles = {
     fontWeight: '700',
     lineHeight: 1,
     transition: 'var(--transition-fast)',
-  },
-  noAlternativesText: {
-    fontSize: '0.72rem',
-    color: 'var(--text-muted)',
-    textAlign: 'center',
-    padding: '12px 10px',
-    border: '1px dashed rgba(255, 255, 255, 0.1)',
-    borderRadius: '8px',
-    backgroundColor: 'rgba(255, 255, 255, 0.02)',
-    marginTop: '10px',
-    lineHeight: '1.4',
   },
 };
 

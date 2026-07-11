@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { generateAiRouteAnalysis } from '../utils/ai';
-import { Send, BrainCircuit, Loader2, Bot } from 'lucide-react';
+import { Send, BrainCircuit, Loader2, Bot, Sparkles, Zap } from 'lucide-react';
 
 export default function AiPanel({ settings, startLocation, destination, routeOptions, selectedRouteIndex }) {
   const [messages, setMessages] = useState([]);
@@ -16,7 +16,7 @@ export default function AiPanel({ settings, startLocation, destination, routeOpt
         {
           id: 'welcome',
           sender: 'ai',
-          text: '👋 Hello! I am your AI Cognitive Advisor. Enter a start point and destination in the Navigation tab, and I will analyze the fastest route, weather conditions, and bottlenecks for you.',
+          text: '👋 Hello! I am your AI Cognitive Advisor.\n\nEnter a start point and destination in the Navigation tab, and I will analyze the fastest route, weather conditions, and bottlenecks for you.',
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -74,7 +74,6 @@ export default function AiPanel({ settings, startLocation, destination, routeOpt
     const userMessageText = inputText;
     setInputText('');
 
-    // Append user message
     const userMsg = {
       id: Date.now().toString(),
       sender: 'user',
@@ -85,7 +84,6 @@ export default function AiPanel({ settings, startLocation, destination, routeOpt
     setLoading(true);
 
     try {
-      // Prompt with full context
       const prompt = `You are a real-time AI Traffic Flow and Navigation Consultant.
 Current Route Context:
 - Starting location: ${startLocation?.name}
@@ -99,7 +97,6 @@ Provide a concise, helpful, and localized answer based on their navigation query
 
       let aiReplyText = '';
       if (!settings.aiKey) {
-        // Mock reply
         aiReplyText = await generateMockChatReply(userMessageText, routeOptions[selectedRouteIndex]);
       } else {
         aiReplyText = await queryCustomAI(settings.aiProvider, settings.aiKey, prompt);
@@ -129,7 +126,6 @@ Provide a concise, helpful, and localized answer based on their navigation query
     }
   };
 
-  // Helper query client AI
   const queryCustomAI = async (provider, apiKey, prompt) => {
     if (provider === 'gemini') {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
@@ -154,12 +150,10 @@ Provide a concise, helpful, and localized answer based on their navigation query
       const data = await res.json();
       return data.choices[0].message.content;
     } else {
-      // Claude CORS fallback
       throw new Error("Claude direct calls restricted by browser CORS. Using fallback simulation.");
     }
   };
 
-  // Realistic chat responses helper
   const generateMockChatReply = (question, selectedRoute) => {
     return new Promise((resolve) => {
       setTimeout(() => {
@@ -181,21 +175,65 @@ Provide a concise, helpful, and localized answer based on their navigation query
     });
   };
 
+  const quickPrompts = [
+    { icon: '🌧️', label: 'Weather impact?' },
+    { icon: '📸', label: 'Speed cameras?' },
+    { icon: '⛽', label: 'Fuel stops?' },
+    { icon: '🚦', label: 'Traffic update?' },
+  ];
+
   return (
     <div style={styles.container}>
-      {/* AI Header */}
+
+      {/* Premium AI Header */}
       <div style={styles.aiHeader}>
-        <div style={styles.badge}>
-          <BrainCircuit size={16} style={{ color: 'var(--primary)' }} />
-          <span>Active Cognitive Core: {settings.aiProvider.toUpperCase()}</span>
+        <div style={styles.aiHeaderLeft}>
+          <div style={styles.aiAvatarLarge}>
+            <BrainCircuit size={18} style={{ color: '#fff' }} />
+          </div>
+          <div>
+            <div style={styles.aiTitle}>Cognitive Advisor</div>
+            <div style={styles.aiSubtitle}>
+              <span style={styles.providerDot} />
+              {settings.aiProvider.toUpperCase()} Engine · {settings.aiKey ? 'Live Mode' : 'Simulation'}
+            </div>
+          </div>
         </div>
         {!settings.aiKey && (
-          <span style={styles.simText}>Simulation Mode</span>
+          <span style={styles.simBadge}>
+            <Zap size={10} />
+            DEMO
+          </span>
+        )}
+        {settings.aiKey && (
+          <span style={styles.livePillBadge}>
+            <span className="pulse-dot" style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#10b981', display: 'inline-block' }} />
+            LIVE AI
+          </span>
         )}
       </div>
 
+      {/* Quick Prompts */}
+      {startLocation && destination && messages.length <= 2 && (
+        <div style={styles.quickPromptsWrap}>
+          <span style={styles.quickPromptsLabel}>Quick Ask</span>
+          <div style={styles.quickPrompts}>
+            {quickPrompts.map((q, i) => (
+              <button
+                key={i}
+                onClick={() => setInputText(q.label.replace('?', ''))}
+                style={styles.quickPromptBtn}
+                disabled={loading}
+              >
+                {q.icon} {q.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Messages Window */}
-      <div style={styles.chatArea}>
+      <div style={styles.chatArea} className="panel-content-scroll">
         {messages.map((msg) => {
           const isAi = msg.sender === 'ai';
           return (
@@ -204,24 +242,28 @@ Provide a concise, helpful, and localized answer based on their navigation query
               style={{
                 ...styles.messageWrapper,
                 justifyContent: isAi ? 'flex-start' : 'flex-end',
+                alignSelf: isAi ? 'flex-start' : 'flex-end',
               }}
             >
               {isAi && (
                 <div style={styles.botAvatar}>
-                  <Bot size={14} />
+                  <Bot size={12} />
                 </div>
               )}
               <div
                 style={{
                   ...styles.bubble,
-                  backgroundColor: isAi ? 'var(--bg-secondary)' : 'var(--primary)',
+                  background: isAi
+                    ? 'var(--bg-secondary)'
+                    : 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
                   color: isAi ? 'var(--text-primary)' : '#ffffff',
                   borderTopLeftRadius: isAi ? '4px' : '16px',
                   borderTopRightRadius: isAi ? '16px' : '4px',
                   border: isAi ? '1px solid var(--border-color)' : 'none',
+                  boxShadow: isAi ? 'var(--shadow-sm)' : '0 4px 16px rgba(99,102,241,0.3)',
                 }}
               >
-                <div style={{ whiteSpace: 'pre-line' }}>{msg.text}</div>
+                <div style={{ whiteSpace: 'pre-line', lineHeight: '1.55' }}>{msg.text}</div>
                 <span style={styles.msgTime}>{msg.time}</span>
               </div>
             </div>
@@ -229,14 +271,18 @@ Provide a concise, helpful, and localized answer based on their navigation query
         })}
 
         {loading && (
-          <div style={styles.messageWrapper}>
+          <div style={{ ...styles.messageWrapper, justifyContent: 'flex-start', alignSelf: 'flex-start' }}>
             <div style={styles.botAvatar}>
-              <Bot size={14} />
+              <Bot size={12} />
             </div>
             <div style={styles.bubbleLoading}>
-              <Loader2 size={16} className="spin" style={{ color: 'var(--text-muted)' }} />
-              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                {generatingSummary ? 'Synthesizing live route telemetry...' : 'AI is processing your query...'}
+              <div style={styles.typingDots}>
+                <span style={{ ...styles.dot, animationDelay: '0ms' }} />
+                <span style={{ ...styles.dot, animationDelay: '160ms' }} />
+                <span style={{ ...styles.dot, animationDelay: '320ms' }} />
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                {generatingSummary ? 'Synthesizing route telemetry...' : 'Thinking...'}
               </span>
             </div>
           </div>
@@ -245,28 +291,39 @@ Provide a concise, helpful, and localized answer based on their navigation query
         <div ref={chatEndRef} />
       </div>
 
-      {/* Chat Input */}
+      {/* Premium Chat Input */}
       <form onSubmit={handleSendMessage} style={styles.chatForm}>
-        <input
-          type="text"
-          placeholder={loading ? 'Thinking...' : 'Ask AI about traffic, safety, speed cameras...'}
-          value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
-          disabled={loading || !startLocation || !destination}
-          style={styles.chatInput}
-        />
-        <button
-          type="submit"
-          disabled={loading || !inputText.trim() || !startLocation || !destination}
-          style={{
-            ...styles.sendBtn,
-            backgroundColor: inputText.trim() ? 'var(--primary)' : 'var(--bg-tertiary)',
-            color: inputText.trim() ? '#ffffff' : 'var(--text-muted)',
-            cursor: inputText.trim() ? 'pointer' : 'default',
-          }}
-        >
-          <Send size={14} />
-        </button>
+        <div style={styles.chatInputWrap}>
+          <input
+            type="text"
+            placeholder={
+              !startLocation || !destination
+                ? 'Set a route first to ask AI...'
+                : loading
+                ? 'AI is thinking...'
+                : 'Ask about traffic, weather, cameras...'
+            }
+            value={inputText}
+            onChange={(e) => setInputText(e.target.value)}
+            disabled={loading || !startLocation || !destination}
+            style={styles.chatInput}
+          />
+          <button
+            type="submit"
+            disabled={loading || !inputText.trim() || !startLocation || !destination}
+            style={{
+              ...styles.sendBtn,
+              background: inputText.trim() && !loading
+                ? 'linear-gradient(135deg, #6366f1, #a855f7)'
+                : 'var(--bg-tertiary)',
+              color: inputText.trim() && !loading ? '#fff' : 'var(--text-muted)',
+              boxShadow: inputText.trim() && !loading ? '0 4px 12px rgba(99,102,241,0.35)' : 'none',
+              cursor: inputText.trim() && !loading ? 'pointer' : 'not-allowed',
+            }}
+          >
+            {loading ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
+          </button>
+        </div>
       </form>
     </div>
   );
@@ -280,109 +337,219 @@ const styles = {
     backgroundColor: 'var(--bg-primary)',
     overflow: 'hidden',
   },
+
+  // ── AI Header ──
   aiHeader: {
-    padding: '12px 16px',
+    padding: '14px 16px',
     borderBottom: '1px solid var(--border-color)',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'var(--bg-tertiary)',
+    background: 'linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(99,102,241,0.05) 100%)',
   },
-  badge: {
+  aiHeaderLeft: {
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    fontSize: '0.75rem',
-    fontWeight: '700',
-    color: 'var(--text-secondary)',
-    textTransform: 'uppercase',
+    gap: '12px',
   },
-  simText: {
-    fontSize: '0.65rem',
-    backgroundColor: 'var(--accent-glow)',
+  aiAvatarLarge: {
+    width: '38px',
+    height: '38px',
+    borderRadius: '12px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 4px 12px rgba(99,102,241,0.35)',
+    flexShrink: 0,
+  },
+  aiTitle: {
+    fontSize: '0.88rem',
+    fontWeight: '800',
+    color: 'var(--text-primary)',
+    letterSpacing: '-0.01em',
+  },
+  aiSubtitle: {
+    fontSize: '0.68rem',
+    color: 'var(--text-muted)',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    marginTop: '1px',
+  },
+  providerDot: {
+    display: 'inline-block',
+    width: '6px',
+    height: '6px',
+    borderRadius: '50%',
+    backgroundColor: '#10b981',
+    boxShadow: '0 0 6px rgba(16,185,129,0.5)',
+  },
+  simBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+    fontSize: '0.62rem',
+    fontWeight: '800',
     color: 'var(--accent)',
-    padding: '2px 8px',
-    borderRadius: '10px',
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    backgroundColor: 'var(--accent-glow)',
+    border: '1px solid rgba(34,211,238,0.2)',
+    padding: '3px 8px',
+    borderRadius: '20px',
+    letterSpacing: '0.05em',
+    flexShrink: 0,
   },
+  livePillBadge: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+    fontSize: '0.62rem',
+    fontWeight: '800',
+    color: '#10b981',
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    border: '1px solid rgba(16,185,129,0.25)',
+    padding: '3px 8px',
+    borderRadius: '20px',
+    letterSpacing: '0.04em',
+    flexShrink: 0,
+  },
+
+  // ── Quick Prompts ──
+  quickPromptsWrap: {
+    padding: '10px 16px',
+    borderBottom: '1px solid var(--border-color)',
+    background: 'rgba(255,255,255,0.015)',
+  },
+  quickPromptsLabel: {
+    fontSize: '0.65rem',
+    fontWeight: '700',
+    color: 'var(--text-muted)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+    display: 'block',
+    marginBottom: '8px',
+  },
+  quickPrompts: {
+    display: 'flex',
+    gap: '6px',
+    flexWrap: 'wrap',
+  },
+  quickPromptBtn: {
+    padding: '5px 10px',
+    borderRadius: '20px',
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-secondary)',
+    color: 'var(--text-secondary)',
+    fontSize: '0.72rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap',
+  },
+
+  // ── Chat Area ──
   chatArea: {
     flex: 1,
     overflowY: 'auto',
     padding: '16px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '16px',
+    gap: '14px',
   },
   messageWrapper: {
     display: 'flex',
     alignItems: 'flex-start',
     gap: '8px',
-    maxWidth: '85%',
+    maxWidth: '88%',
+    animation: 'fadeIn 0.25s ease',
   },
   botAvatar: {
-    width: '24px',
-    height: '24px',
-    borderRadius: '50%',
-    backgroundColor: 'var(--primary-glow)',
-    color: 'var(--primary)',
+    width: '26px',
+    height: '26px',
+    borderRadius: '8px',
+    background: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)',
+    color: '#fff',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
     marginTop: '4px',
+    boxShadow: '0 2px 8px rgba(99,102,241,0.3)',
   },
   bubble: {
-    padding: '12px 16px',
+    padding: '12px 14px',
     borderRadius: '16px',
-    fontSize: '0.85rem',
-    lineHeight: '1.45',
-    boxShadow: 'var(--shadow-sm)',
+    fontSize: '0.84rem',
     display: 'flex',
     flexDirection: 'column',
     gap: '4px',
   },
   bubbleLoading: {
-    padding: '10px 16px',
+    padding: '12px 14px',
     borderRadius: '16px',
     border: '1px solid var(--border-color)',
     backgroundColor: 'var(--bg-secondary)',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: '10px',
+  },
+  typingDots: {
+    display: 'flex',
+    gap: '4px',
+    alignItems: 'center',
+  },
+  dot: {
+    width: '7px',
+    height: '7px',
+    borderRadius: '50%',
+    backgroundColor: 'var(--primary)',
+    animation: 'bounce 1.2s infinite ease-in-out',
+    display: 'inline-block',
   },
   msgTime: {
-    fontSize: '0.65rem',
+    fontSize: '0.62rem',
     color: 'var(--text-muted)',
     alignSelf: 'flex-end',
-    marginTop: '2px',
+    marginTop: '4px',
+    opacity: 0.7,
   },
+
+  // ── Chat Input ──
   chatForm: {
-    padding: '12px 16px',
+    padding: '12px 14px',
     borderTop: '1px solid var(--border-color)',
+    background: 'var(--bg-secondary)',
+  },
+  chatInputWrap: {
     display: 'flex',
-    gap: '10px',
-    backgroundColor: 'var(--bg-secondary)',
+    gap: '8px',
+    alignItems: 'center',
+    padding: '6px 6px 6px 14px',
+    borderRadius: '12px',
+    border: '1px solid var(--border-color)',
+    background: 'var(--bg-tertiary)',
+    transition: 'var(--transition-smooth)',
   },
   chatInput: {
     flex: 1,
-    padding: '10px 14px',
-    borderRadius: '8px',
-    border: '1px solid var(--border-color)',
-    background: 'var(--bg-tertiary)',
+    background: 'none',
+    border: 'none',
+    outline: 'none',
     color: 'var(--text-primary)',
     fontFamily: 'var(--font-sans)',
-    fontSize: '0.85rem',
-    outline: 'none',
+    fontSize: '0.84rem',
+    minWidth: 0,
   },
   sendBtn: {
-    width: '36px',
-    height: '36px',
+    width: '34px',
+    height: '34px',
     borderRadius: '8px',
     border: 'none',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    transition: 'var(--transition-smooth)',
+    transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)',
+    flexShrink: 0,
   },
 };
